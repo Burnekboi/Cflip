@@ -1,22 +1,19 @@
 /**
- * Telegram Mini App initData verification helpers.
+ * Telegram Mini App initData verification.
  *
- * Stateless auth model:
- *  - The Mini App sends Telegram initData in a header or body to the backend.
- *  - The backend verifies it against Telegram's digest, using the bot token.
- *  - If valid, the backend treats the verified Telegram user id as the user
- *    identity and records/loads the profile from Supabase.
+ * Stateless auth model: the Mini App sends `Telegram.WebApp.initData` with each
+ * request, the backend verifies the signature with the bot token, and the
+ * verified Telegram user id becomes the identity. No sessions, no cookies.
  *
- * This module does not depend on Supabase. It is a pure verification layer so
- * the auth contract can be reused by the webhook, the Mini App API routes, and
- * future bot handlers.
+ * Algorithm (https://core.telegram.org/bots/webapps#validating-received-data):
+ *   dataCheckString = sorted "key=value" pairs of all fields except `hash`,
+ *                     joined by newlines
+ *   secretKey       = HMAC_SHA256("WebAppData", botToken)
+ *   computedHash    = HMAC_SHA256(secretKey, dataCheckString) as hex
+ *   valid           = computedHash === hash
  */
 
-export type TelegramInitData = {
-  auth_date: string;
-  hash: string;
-  [key: string]: string | undefined;
-};
+import crypto from 'node:crypto';
 
 export type VerifiedTelegramUser = {
   telegramId: number;
@@ -25,134 +22,83 @@ export type VerifiedTelegramUser = {
   username?: string;
   languageCode?: string;
   photoUrl?: string;
+  isPremium: boolean;
   authDate: number;
-  initDataRaw?: string;
 };
 
-/**
- * Verify Telegram WebApp initData and return a verified user payload.
- *
- * Telegram's WebApp initData is signed with the bot token. Verification is done
- * by recomputing the SHA256 digest of the initData params (excluding the hash
- * key) and comparing it to the `hash` value with the bot token as the secret.
- *
- * References:
- *  - https://core.telegram.org/bots/webapps#validating-received-data
- */
-export async function verifyTelegramInitData(
-  initData: string | TelegramInitData,
-  botToken: string
-): Promise<VerifiedTelegramUser> {
-  const raw =
-    typeof initData === 'string'
-      ? initData
-      : Object.entries(initData)
-          .map(([key, value]) => `${key}=${value}`)
-          .join('\n');
+export type VerifyOptions = {
+  /** Reject initData older than this many seconds. Telegram recommends 24h. */
+  maxAgeSeconds?: number;
+};
 
-  const params = parseQueryString(raw);
-  const hash = params.get('hash');
-  if (!hash) {
-    throw new Error('Missing initData hash');
-  }
+const DEFAULT_MAX_AGE_SECONDS = 24 * 60 * 60;
 
-  params.delete('hash');
-  const checkString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}={value}`)
+export function verifyTelegramInitData(
+  initData: string,
+  botToken: string,
+  options: VerifyOptions = {}
+): VerifiedTelegramUser {
+  if (!initData) throw new Error('Missing initData');
+  if (!botToken) throw new Error('Missing bot token');
+
+  const params = new URLSearchParams(initData);
+  const receivedHash = params.get('hash');
+  if (!receivedHash) throw new Error('Missing initData hash');
+
+  const dataCheckString = [...params.entries()]
+    .filter(([key]) => key !== 'hash')
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, value]) => `${key}=${value}`)
     .join('\n');
 
-  const cryptoApi = createCryptoApi();
-  const secretHash = await cryptoApi.sha256(`WebAppData${botToken}`);
-  const computedHash = await cryptoApi.hmacSha256(secretHash, checkString);
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const computedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
 
-  if (computedHash !== hash) {
-    throw new Error('Invalid initData hash');
+  if (!timingSafeEqualHex(computedHash, receivedHash)) {
+    throw new Error('Invalid initData signature');
   }
 
-  const authDate = parseInt(params.get('auth_date') || '', 10);
-  if (Number.isNaN(authDate)) {
-    throw new Error('Missing auth_date');
+  const authDate = Number.parseInt(params.get('auth_date') || '', 10);
+  if (!Number.isFinite(authDate)) throw new Error('Missing auth_date');
+
+  const maxAge = options.maxAgeSeconds ?? DEFAULT_MAX_AGE_SECONDS;
+  const ageSeconds = Math.floor(Date.now() / 1000) - authDate;
+  if (ageSeconds > maxAge) {
+    throw new Error('initData expired');
   }
 
-  const userRaw = params.get('user');
-  if (!userRaw) {
-    throw new Error('Missing user object');
+  const userJson = params.get('user');
+  if (!userJson) throw new Error('Missing user in initData');
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(userJson) as Record<string, unknown>;
+  } catch {
+    throw new Error('Malformed user in initData');
   }
 
-  const user = parseQueryString(userRaw);
-  const telegramId = parseInt(user.get('id') || '', 10);
-  if (Number.isNaN(telegramId)) {
-    throw new Error('Missing user.id');
-  }
+  const telegramId = Number(raw.id);
+  if (!Number.isFinite(telegramId)) throw new Error('Missing user id');
 
   return {
     telegramId,
-    firstName: user.get('first_name') || '',
-    lastName: user.get('last_name') || undefined,
-    username: user.get('username') || undefined,
-    languageCode: user.get('language_code') || undefined,
-    photoUrl: user.get('photo_url') || undefined,
+    firstName: typeof raw.first_name === 'string' ? raw.first_name : '',
+    lastName: typeof raw.last_name === 'string' ? raw.last_name : undefined,
+    username: typeof raw.username === 'string' ? raw.username : undefined,
+    languageCode: typeof raw.language_code === 'string' ? raw.language_code : undefined,
+    photoUrl: typeof raw.photo_url === 'string' ? raw.photo_url : undefined,
+    isPremium: raw.is_premium === true,
     authDate,
-    initDataRaw: typeof initData === 'string' ? initData : undefined,
   };
 }
 
-function parseQueryString(query: string): URLSearchParams {
-  return new URLSearchParams(query);
-}
-
-type CryptoApi = {
-  sha256(message: string): Promise<string>;
-  hmacSha256(secret: string, message: string): Promise<string>;
-};
-
-function createCryptoApi(): CryptoApi {
-  // Prefer Web Crypto when available (browser + recent Node).
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
-    return {
-      sha256: async (message: string) => {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(message);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return arrayBufferToHex(hashBuffer);
-      },
-      hmacSha256: async (secret: string, message: string) => {
-        const keyMaterial = await crypto.subtle.importKey(
-          'raw',
-          new TextEncoder().encode(secret),
-          { name: 'HMAC', hash: 'SHA-256' },
-          false,
-          ['sign']
-        );
-        const signature = await crypto.subtle.sign(
-          'HMAC',
-          keyMaterial,
-          new TextEncoder().encode(message)
-        );
-        return arrayBufferToHex(signature);
-      },
-    };
-  }
-
-  // Fallback for environments without Web Crypto: use Node's crypto module.
-  // This import is conditional so the browser bundle can omit it.
-  try {
-    const nodeCrypto = require('node:crypto');
-    return {
-      sha256: (message: string) => {
-        return nodeCrypto.createHash('sha256').update(message, 'utf8').digest('hex');
-      },
-      hmacSha256: (secret: string, message: string) => {
-        return nodeCrypto.createHmac('sha256', secret).update(message, 'utf8').digest('hex');
-      },
-    };
-  } catch {
-    throw new Error('No SHA-256 implementation available');
-  }
-}
-
-function arrayBufferToHex(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }

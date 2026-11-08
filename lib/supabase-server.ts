@@ -1,50 +1,47 @@
 /**
- * Supabase server-side data access for the CryptoFlip backend.
+ * Supabase data access for the CryptoFlip backend.
  *
- * This module wraps the Supabase JS client from the server's perspective. It
- * exposes only the operations the verified-invite backend needs today:
+ * Every function takes a connected client that uses the service role key, since
+ * all tables have RLS enabled with no policies (the browser cannot touch them).
  *
+ * Operations:
  *  - upsertTelegramUser
  *  - findOrCreateWallet
  *  - getOrCreateInviteToken
- *  - creditInvite
- *
- * The actual Supabase client is created by the server entrypoint because the
- * Supabase JS library import shape depends on the runtime. This module receives
- * the client as an argument and stays environment-agnostic.
- *
- * Schema notes
- * ------------
- * See supabase/schema.sql for the table definitions these functions rely on.
+ *  - creditInvite (via the atomic credit_invite RPC)
+ *  - countInviteClaimsForUser
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type ServerSupabase = {
-  client: SupabaseClient;
-  config: {
-    url: string;
-    anonKey: string;
-    serviceRoleKey?: string;
-  };
+export type TelegramProfile = {
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  languageCode?: string;
+  photoUrl?: string;
 };
 
-/**
- * Upsert the Telegram user profile from verified initData.
- * Returns the created/updated user row.
- */
+export type UserRow = {
+  id: string;
+  telegram_id: number;
+  username: string | null;
+  first_name: string | null;
+};
+
+export type WalletRow = {
+  id: string;
+  user_id: string;
+  chips: number;
+};
+
+/** Create or refresh the Telegram user, returning the canonical row. */
 export async function upsertTelegramUser(
-  db: ServerSupabase,
+  client: SupabaseClient,
   telegramId: number,
-  profile: {
-    username?: string;
-    firstName?: string;
-    lastName?: string;
-    languageCode?: string;
-    photoUrl?: string;
-  }
-) {
-  const { data, error } = await db.client
+  profile: TelegramProfile
+): Promise<UserRow> {
+  const { data, error } = await client
     .from('users')
     .upsert(
       {
@@ -54,192 +51,159 @@ export async function upsertTelegramUser(
         last_name: profile.lastName ?? null,
         language_code: profile.languageCode ?? null,
         avatar_url: profile.photoUrl ?? null,
+        updated_at: new Date().toISOString(),
       },
-      { onConflict: 'telegram_id', returning: 'representation' }
+      { onConflict: 'telegram_id' }
     )
-    .select()
+    .select('id, telegram_id, username, first_name')
     .single();
 
-  if (error) {
-    throw new Error(`Supabase upsert user failed: ${error.message}`);
-  }
-
-  return data as {
-    id: string;
-    telegram_id: number;
-    username: string | null;
-    first_name: string | null;
-    last_name: string | null;
-    created_at: string;
-  };
+  if (error) throw new Error(`upsert user failed: ${error.message}`);
+  return data as UserRow;
 }
 
-/**
- * Find or create the wallet for a user.
- * Returns the wallet row.
- */
+/** Find the wallet for a user, creating it with 0 chips if absent. */
 export async function findOrCreateWallet(
-  db: ServerSupabase,
+  client: SupabaseClient,
   userId: string
-) {
-  const { data, error } = await db.client
+): Promise<WalletRow> {
+  const existing = await client
     .from('wallets')
-    .select()
+    .select('id, user_id, chips')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (!error && data) {
-    return data as { id: string; user_id: string; chips: number };
-  }
+  if (existing.error) throw new Error(`read wallet failed: ${existing.error.message}`);
+  if (existing.data) return existing.data as WalletRow;
 
-  const inserted = await db.client
+  const inserted = await client
     .from('wallets')
     .insert({ user_id: userId })
-    .select()
+    .select('id, user_id, chips')
     .single();
 
-  if (inserted.error) {
-    throw new Error(`Supabase create wallet failed: ${inserted.error.message}`);
-  }
-
-  return inserted.data as { id: string; user_id: string; chips: number };
+  if (inserted.error) throw new Error(`create wallet failed: ${inserted.error.message}`);
+  return inserted.data as WalletRow;
 }
 
-/**
- * Get or create the invite token for a user.
- * Returns only the token value so the frontend can build the invite link.
- */
-export async function getOrCreateInviteToken(db: ServerSupabase, userId: string) {
-  const { data, error } = await db.client
+/** Get the user's invite token, creating one on first use. */
+export async function getOrCreateInviteToken(
+  client: SupabaseClient,
+  userId: string
+): Promise<string> {
+  const existing = await client
     .from('invite_tokens')
     .select('token')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (!error && data?.token) {
-    return data.token;
+  if (existing.error) throw new Error(`read invite token failed: ${existing.error.message}`);
+  if (existing.data?.token) return existing.data.token as string;
+
+  // Retry a few times in the unlikely event of a token collision.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const token = generateInviteToken();
+    const inserted = await client
+      .from('invite_tokens')
+      .insert({ user_id: userId, token })
+      .select('token')
+      .single();
+
+    if (!inserted.error) return inserted.data.token as string;
+
+    // 23505 = unique violation; retry with a new token.
+    if (inserted.error.code !== '23505') {
+      throw new Error(`create invite token failed: ${inserted.error.message}`);
+    }
+
+    // The user_id unique index may have been filled by a concurrent request.
+    const raced = await client
+      .from('invite_tokens')
+      .select('token')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (raced.data?.token) return raced.data.token as string;
   }
 
-  const token = generateInviteToken();
-
-  const inserted = await db.client
-    .from('invite_tokens')
-    .insert({ user_id: userId, token })
-    .select('token')
-    .single();
-
-  if (inserted.error) {
-    throw new Error(`Supabase create invite token failed: ${inserted.error.message}`);
-  }
-
-  return inserted.data.token;
+  throw new Error('create invite token failed: token collisions exhausted');
 }
 
+export type CreditInviteResult = {
+  chipsAwarded: number;
+  walletChips: number;
+  totalClaims: number;
+};
+
 /**
- * Credit an inviter for a verified invite join.
+ * Credit an inviter for a verified invite.
  *
- * This is the atomic reward path for verified invites. It is driven server-side
- * because the backend is the only place that knows whether the invited user is
- * new and whether the inviter has remaining rewards.
- *
- * Returns the credit record and the new wallet chip count.
+ * Delegates to the `credit_invite` Postgres function so the ledger insert, the
+ * cap check, and the wallet top-up happen in one transaction. Throws with the
+ * Postgres error message for expected failures (`invite_reward_exhausted`,
+ * `self_invite`).
  */
 export async function creditInvite(
-  db: ServerSupabase,
+  client: SupabaseClient,
   inviterUserId: string,
   invitedUserId: string,
   token: string,
-  chipsAwarded: number
-) {
-  const { error } = await db.client
-    .from('invite_claims')
-    .insert({
-      inviter_user_id: inviterUserId,
-      invited_user_id: invitedUserId,
-      token,
-      chips_awarded: chipsAwarded,
-    })
-    .select()
-    .single();
+  chipsAwarded: number,
+  maxRewards: number
+): Promise<CreditInviteResult> {
+  const { data, error } = await client.rpc('credit_invite', {
+    p_inviter_user_id: inviterUserId,
+    p_invited_user_id: invitedUserId,
+    p_token: token,
+    p_chips: chipsAwarded,
+    p_max_rewards: maxRewards,
+  });
 
-  if (error) {
-    const match =
-      error.message?.includes('duplicate') ||
-      error.code === '23505'
-        ? 'Invite reward already credited for this pair'
-        : error.message;
-    throw new Error(`Supabase create invite claim failed: ${match}`);
-  }
+  if (error) throw new Error(`credit invite failed: ${error.message}`);
 
-  // Add chips to the inviter's wallet.
-  const { error: updateError } = await db.client
-    .from('wallets')
-    .update({
-      chips: db.client.sql`chips + ${chipsAwarded}`,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', inviterUserId)
-    .select('chips')
-    .single();
-
-  if (updateError) {
-    throw new Error(`Supabase credit invite chips failed: ${updateError.message}`);
-  }
-
+  const result = (data || {}) as Record<string, unknown>;
   return {
-    inviterUserId,
-    invitedUserId,
-    token,
-    chipsAwarded,
+    chipsAwarded: Number(result.chips_awarded ?? chipsAwarded),
+    walletChips: Number(result.wallet_chips ?? 0),
+    totalClaims: Number(result.total_claims ?? 0),
   };
 }
 
-/**
- * Generate a deterministic-looking, URL-safe invite token.
- *
- * For now this is a random token. If you later want a friendlier "username"
- * style link, this is the one place to change.
- */
-export function generateInviteToken(): string {
-  const chars =
-    'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abdehkmnprtw';
-  const length = 8;
-  let token = '';
-  const randomValues = new Uint8Array(length);
-
-  // Try the Web Crypto API first. On Node that is available since recent
-  // versions; if it is missing we fall back to Math.random here because the
-  // backend is the only place that creates tokens.
-  try {
-    globalThis.crypto.getRandomValues(randomValues);
-  } catch {
-    for (let i = 0; i < length; i++) {
-      randomValues[i] = Math.floor(Math.random() * 256);
-    }
-  }
-
-  for (let i = 0; i < length; i++) {
-    token += chars[randomValues[i] % chars.length];
-  }
-
-  return token;
-}
-
-/**
- * Count how many invite rewards an inviter has already credited.
- */
+/** How many invite rewards an inviter has already been credited. */
 export async function countInviteClaimsForUser(
-  db: ServerSupabase,
+  client: SupabaseClient,
   userId: string
 ): Promise<number> {
-  const { count, error } = await db.client
+  const { count, error } = await client
     .from('invite_claims')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('inviter_user_id', userId);
 
-  if (error) {
-    throw new Error(`Supabase count invite claims failed: ${error.message}`);
-  }
+  if (error) throw new Error(`count invite claims failed: ${error.message}`);
+  return count ?? 0;
+}
 
-  return (count as number) || 0;
+/** Find the inviter user id behind an invite token. */
+export async function findInviterByToken(
+  client: SupabaseClient,
+  token: string
+): Promise<string | null> {
+  const { data, error } = await client
+    .from('invite_tokens')
+    .select('user_id')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (error) throw new Error(`lookup invite token failed: ${error.message}`);
+  return (data?.user_id as string) ?? null;
+}
+
+/** Unambiguous, URL-safe invite token (no 0/O/1/I/l to avoid typos). */
+export function generateInviteToken(length = 8): string {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  let token = '';
+  for (let i = 0; i < length; i++) {
+    token += alphabet[bytes[i] % alphabet.length];
+  }
+  return token;
 }

@@ -1,43 +1,46 @@
 /**
- * Supabase bootstrap for the CryptoFlip backend.
+ * Supabase configuration for the CryptoFlip backend.
  *
- * Right now this module exposes one thing: a validated Supabase configuration
- * shape. The server uses this to confirm the environment is coherent before it
- * starts serving requests.
- *
- * The actual Supabase client creation is left to the Node entrypoint for now,
- * because the JS client is loaded differently in the backend than in the browser.
- * When we add Supabase on the frontend, we will add a separate browser bootstrap
- * here rather than mixing environments.
+ * Single source of truth for which Supabase env vars the server needs and how
+ * they are validated. Keeping it here means the server can fail with a clear
+ * message instead of a confusing runtime error deep inside a request handler.
  */
 
 export type SupabaseConfig = {
   url: string;
   anonKey: string;
-  serviceRoleKey?: string;
+  serviceRoleKey: string;
 };
 
-export function validateSupabaseEnv() {
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+/**
+ * Read and validate the Supabase env contract.
+ *
+ * The service role key is required, not optional: every table has RLS enabled
+ * with no policies, so the anon key intentionally cannot read or write. The
+ * backend is the only writer.
+ */
+export function validateSupabaseConfig(): SupabaseConfig {
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const anonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-  if (!url || typeof url !== 'string') {
-    throw new Error('SUPABASE_URL is required');
-  }
-  if (!anonKey || typeof anonKey !== 'string') {
-    throw new Error('SUPABASE_ANON_KEY is required');
+  const missing: string[] = [];
+  if (!url) missing.push('SUPABASE_URL');
+  if (!anonKey) missing.push('SUPABASE_ANON_KEY');
+  if (!serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (missing.length > 0) {
+    throw new Error(`Missing Supabase env vars: ${missing.join(', ')}`);
   }
 
-  return {
-    url: url.trim(),
-    anonKey: anonKey.trim(),
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
-      : undefined,
-  };
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error('SUPABASE_URL must start with https://');
+  }
+
+  return { url, anonKey, serviceRoleKey };
 }
 
-export function isSupabaseConfigured() {
+export function isSupabaseConfigured(): boolean {
   try {
     validateSupabaseConfig();
     return true;

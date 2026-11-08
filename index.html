@@ -843,63 +843,59 @@
           InviteModal.render();
         }
 
-        // Backend bootstrap state
-        let suppressInviteApiUntil = 0;
+        // Latest verified server state (wallet balance + invite status).
+        let backendState = null;
 
         /**
          * Backend API helper for the verified Telegram path.
-         * Right now the only read path is /api/me, which returns the verified
-         //  user's invite link and invite-reward status once Telegram initData is
-         //  present.
+         *
+         * /api/me verifies Telegram initData server-side and returns the user's
+         * own invite link plus invite-reward status. Telegram's start_param is
+         * forwarded so the backend can attribute a verified invite on first open.
          */
         const BackendApi = {
+          startParam() {
+            if (!TG || !TG.initDataUnsafe) return '';
+            return TG.initDataUnsafe.start_param || '';
+          },
+
           async me() {
             const initData = TG && TG.initData ? TG.initData : null;
-            if (!initData && typeof window !== 'undefined') {
-              return null;
-            }
+            if (!initData) return null;
 
-            const headers: Record<string, string> = {};
-            if (initData) {
-              headers['X-Telegram-Init-Data'] = initData;
-            }
+            const params = new URLSearchParams();
+            const start = this.startParam();
+            if (start) params.set('start', start);
 
-            const res = await fetch('/api/me', {
-              headers,
+            const query = params.toString();
+            const res = await fetch('/api/me' + (query ? '?' + query : ''), {
+              headers: { 'X-Telegram-Init-Data': initData },
             });
-            if (!res.ok) {
-              return null;
-            }
+            if (!res.ok) return null;
             return res.json().catch(() => null);
           },
         };
 
         /**
-         * Apply the verified invite link from the backend to the UI.
-         */
-        function applyBackendInvite(data: unknown) {
-          if (!data || typeof data !== 'object') return;
-          const d = data as Record<string, any>;
-          if (d && d.ok && typeof d.invite === 'object' && d.invite) {
-            const link = d.invite.link || '';
-            if (link) {
-              setInviteLink(link);
-            }
-          }
-        }
-
-        /**
          * Fetch the verified invite link from the backend once Telegram is ready.
-         * This runs after the initial UI is laid out so the invite modal can show the
-         //  real link immediately once it exists.
+         * Runs after the initial UI is laid out so the invite modal shows the real
+         * link as soon as it exists.
          */
         async function bootstrapBackendInvite() {
-          const now = Date.now();
-          if (now < suppressInviteApiUntil) return;
           try {
             const data = await BackendApi.me();
-            if (data && data.ok && data.invite && data.invite.link) {
+            if (!data || !data.ok) return;
+
+            backendState = data;
+
+            if (data.invite && data.invite.link) {
               setInviteLink(data.invite.link);
+            }
+
+            // Server-side invite count is authoritative once available.
+            if (data.invite && typeof data.invite.claimed === 'number') {
+              Wallet.rewards.invitesClaimedBackend = data.invite.claimed;
+              Wallet.syncRewardsUI();
             }
           } catch (e) {
             console.warn('Backend invite bootstrap failed:', e);

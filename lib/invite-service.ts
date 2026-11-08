@@ -1,144 +1,112 @@
 /**
- * Verified invite flow service for the CryptoFlip backend.
+ * Verified invite attribution.
  *
- * This is the business logic layer for the invite referral reward.
- * It sits between Telegram-linked auth and Supabase so the API routes stay thin
- * and the reward rules live in one place.
+ * Turns a Telegram start parameter ("invite_<token>") into an inviter credit.
+ * The backend is the only place this runs, because only the backend can trust
+ * who the invited user is (verified initData) and enforce the reward cap.
  *
- * Responsibilities
- * ----------------
- *  - Turn the invite token from a Telegram bot start link into an inviter
- *    identity and credit that inviter when a new user arrives through the link.
- *  - Enforce the invite reward cap server-side; the client may show UI, but the
- *    real credit decision is made here.
- *  - Protect against double-crediting by recording each invite pair in
- *    `invite_claims`.
- *
- * Assumptions
- * -----------
- *  - The Mini App invite link uses the Telegram bot start parameter shape:
- *      https://t.me/:botUsername?start=invite_<token>
- *  - The inviter is identified by their Supabase user id; the invited user is
- *    also identified by Telegram and has a Supabase user row (created or found
- *    on first load).
+ * Rules:
+ *  - the invited user must not be the inviter
+ *  - each inviter earns at most MAX_INVITE_REWARDS credits
+ *  - an inviter is credited at most once per invited user
+ *  - the reward is INVITE_REWARD_CHIPS per credited invite
  */
 
-import type { ServerSupabase } from './supabase-server.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import {
-  getOrCreateInviteToken,
-  findOrCreateWallet,
   creditInvite,
+  findInviterByToken,
+  findOrCreateWallet,
+  upsertTelegramUser,
   countInviteClaimsForUser,
+  type TelegramProfile,
 } from './supabase-server.js';
 import { parseInviteTokenFromStartParam } from '../config.js';
 
-export type InviteCreditResult =
-  | { credited: true; inviterUserId: string; chipsAwarded: number }
-  | { credited: false; reason: 'already_credited' | 'inviter_not_found' | 'inviter_reward_exhausted' | 'invalid_token' };
+export const INVITE_REWARD_CHIPS = 1000;
+export const MAX_INVITE_REWARDS = 3;
+
+export type InviteAttributionOutcome =
+  | { credited: true; chipsAwarded: number; remaining: number }
+  | {
+      credited: false;
+      reason:
+        | 'no_start_param'
+        | 'self_invite'
+        | 'inviter_not_found'
+        | 'already_credited'
+        | 'reward_exhausted'
+        | 'failed';
+    };
 
 export type InviteAttributionInput = {
-  /** Verified Telegram user id of the person opening the link. */
+  /** Verified Telegram id of the user who opened the link. */
   invitedTelegramId: number;
-  /** Telegram start parameter value, e.g. "invite_ABC123". */
-  startParam: string | null;
-  /** Optional profile fields for the invited user. */
-  invitedProfile?: {
-    username?: string;
-    firstName?: string;
-    lastName?: string;
-    languageCode?: string;
-    photoUrl?: string;
-  };
+  /** Telegram start parameter, e.g. "invite_ABC23XYZ". */
+  startParam: string | null | undefined;
+  /** Profile of the invited user, from verified initData. */
+  invitedProfile: TelegramProfile;
 };
 
-const INVITE_REWARD_CHIPS = 1000;
-const MAX_INVITE_REWARDS = 3;
-
 export async function attributeInviteVisit(
-  db: ServerSupabase,
+  client: SupabaseClient,
   input: InviteAttributionInput
-): Promise<InviteCreditResult> {
-  const token = parseInviteTokenFromStartParam(input.startParam);
-  if (!token) {
-    return { credited: false, reason: 'invalid_token' };
+): Promise<InviteAttributionOutcome> {
+  const token = parseInviteTokenFromStartParam(input.startParam ?? null);
+  if (!token) return { credited: false, reason: 'no_start_param' };
+
+  try {
+    const inviterUserId = await findInviterByToken(client, token);
+    if (!inviterUserId) return { credited: false, reason: 'inviter_not_found' };
+
+    const invited = await upsertTelegramUser(
+      client,
+      input.invitedTelegramId,
+      input.invitedProfile
+    );
+
+    if (invited.id === inviterUserId) {
+      return { credited: false, reason: 'self_invite' };
+    }
+
+    // Wallet exists for the invited user so their balance is ready.
+    await findOrCreateWallet(client, invited.id);
+
+    const alreadyClaimed = await countInviteClaimsForUser(client, inviterUserId);
+    if (alreadyClaimed >= MAX_INVITE_REWARDS) {
+      return { credited: false, reason: 'reward_exhausted' };
+    }
+
+    const result = await creditInvite(
+      client,
+      inviterUserId,
+      invited.id,
+      token,
+      INVITE_REWARD_CHIPS,
+      MAX_INVITE_REWARDS
+    );
+
+    return {
+      credited: true,
+      chipsAwarded: result.chipsAwarded,
+      remaining: Math.max(0, MAX_INVITE_REWARDS - result.totalClaims),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Postgres raises these codes for expected, non-exceptional outcomes.
+    if (message.includes('invite_reward_exhausted')) {
+      return { credited: false, reason: 'reward_exhausted' };
+    }
+    if (message.includes('self_invite')) {
+      return { credited: false, reason: 'self_invite' };
+    }
+    if (message.includes('duplicate key value')) {
+      return { credited: false, reason: 'already_credited' };
+    }
+
+    console.error('[invite] attribution failed:', error);
+    return { credited: false, reason: 'failed' };
   }
-
-  // Find the inviter by invite token.
-  const inviter = await findInviterByToken(db, token);
-  if (!inviter) {
-    return { credited: false, reason: 'inviter_not_found' };
-  }
-
-  // Ensure the invited user exists.
-  const invited = await upsertTelegramUser(db, input.invitedTelegramId, input.invitedProfile ?? {});
-  await findOrCreateWallet(db, invited.id);
-
-  const claims = await countInviteClaimsForUser(db, inviter.id);
-  if (claims >= MAX_INVITE_REWARDS) {
-    return { credited: false, reason: 'inviter_reward_exhausted' };
-  }
-
-  const { error } = await db.client
-    .from('invite_claims')
-    .select('id')
-    .eq('inviter_user_id', inviter.id)
-    .eq('invited_user_id', invited.id)
-    .maybeSingle();
-
-  if (!error && error === null && (error as unknown as { id?: string } | null)?.id) {
-    return { credited: false, reason: 'already_credited' };
-  }
-
-  const credit = await creditInvite(db, inviter.id, invited.id, token, INVITE_REWARD_CHIPS);
-
-  return {
-    credited: true,
-    inviterUserId: inviter.id,
-    chipsAwarded: credit.chipsAwarded,
-  };
-}
-
-async function findInviterByToken(db: ServerSupabase, token: string) {
-  const { data, error } = await db.client
-    .from('invite_tokens')
-    .select('user_id')
-    .eq('token', token)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data.user_id as string;
-}
-
-async function upsertTelegramUser(
-  db: ServerSupabase,
-  telegramId: number,
-  profile: {
-    username?: string;
-    firstName?: string;
-    lastName?: string;
-    languageCode?: string;
-    photoUrl?: string;
-  }
-) {
-  const { data, error } = await db.client
-    .from('users')
-    .upsert(
-      {
-        telegram_id: telegramId,
-        username: profile.username ?? null,
-        first_name: profile.firstName ?? null,
-        last_name: profile.lastName ?? null,
-        language_code: profile.languageCode ?? null,
-        avatar_url: profile.photoUrl ?? null,
-      },
-      { onConflict: 'telegram_id', returning: 'representation' }
-    )
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Supabase upsert user failed: ${error.message}`);
-  }
-
-  return data as { id: string };
 }

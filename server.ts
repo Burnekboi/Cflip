@@ -1,36 +1,29 @@
 /**
- * CryptoFlip TMA backend entrypoint (Render-hosted).
+ * CryptoFlip TMA backend (Render).
  *
- * This server is the verified backend for the Telegram Mini App. It:
- *  - serves the built Mini App static files
- *  - verifies Telegram WebApp initData
- *  - creates/updates Telegram users in Supabase on first sighting
- *  - exposes the inviter's own invite link and bootstrap data
- *  - is ready for a future Telegram bot webhook that will handle the
- *    ?start=invite_<token> attribution flow
+ * Responsibilities:
+ *  - serve the built Mini App from dist/
+ *  - verify Telegram WebApp initData on every API call
+ *  - create/update the Telegram user and wallet in Supabase
+ *  - return the user's own invite link and invite-reward status
+ *  - attribute a verified invite when the Mini App reports a start param
  *
- * Environment
- * -----------
- * TELEGRAM_BOT_TOKEN        - BotFather bot token
- * TELEGRAM_BOT_USERNAME     - Bot username, e.g. "cryptoflipbot"
- * SUPABASE_URL              - Supabase project URL
- * SUPABASE_ANON_KEY         - Supabase anon key (server uses Supabase client)
- * SUPABASE_SERVICE_ROLE_KEY - Optional service role key for server-side writes
- * APP_URL                   - Public URL of this deployment
- *
- * If you want the server to also verify initData signatures with the classic
- * Telegram API secret, keep TELEGRAM_BOT_TOKEN set. The current implementation
- * uses the WebApp initData verification path described at:
- *   https://core.telegram.org/bots/webapps#validating-received-data
+ * Environment:
+ *   TELEGRAM_BOT_TOKEN         bot token from BotFather
+ *   TELEGRAM_BOT_USERNAME      bot username without the @
+ *   SUPABASE_URL               https://<ref>.supabase.co
+ *   SUPABASE_ANON_KEY          project anon key
+ *   SUPABASE_SERVICE_ROLE_KEY  project service role key (required, RLS bypass)
+ *   APP_URL                    public URL of this deployment
+ *   PORT                       provided by Render
  */
 
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import express from 'express';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { validateSupabaseConfig, type SupabaseConfig } from './supabase/index.js';
 import { verifyTelegramInitData } from './lib/telegram-auth.js';
@@ -40,207 +33,193 @@ import {
   getOrCreateInviteToken,
   countInviteClaimsForUser,
 } from './lib/supabase-server.js';
+import {
+  attributeInviteVisit,
+  MAX_INVITE_REWARDS,
+} from './lib/invite-service.js';
 import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const app = express();
-
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+const distDir = path.resolve(__dirname, 'dist');
+const indexHtmlPath = path.join(distDir, 'index.html');
 
 // ---------------------------------------------------------------------------
-// Startup config validation
+// Config
 // ---------------------------------------------------------------------------
 
-const requiredEnvVars: string[] = [];
+const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 
-if (!process.env.TELEGRAM_BOT_TOKEN) {
-  requiredEnvVars.push('TELEGRAM_BOT_TOKEN');
-}
+let supabaseConfig: SupabaseConfig | null = null;
+let configError: string | null = null;
 
-let supabaseConfig: SupabaseConfig;
 try {
   supabaseConfig = validateSupabaseConfig();
 } catch (error) {
-  requiredEnvVars.push(String(error));
-  supabaseConfig = { url: '', anonKey: '' };
+  configError = error instanceof Error ? error.message : String(error);
 }
 
-if (requiredEnvVars.length > 0) {
-  console.warn(
-    '[server] Missing required env vars. The server will start, but Telegram auth and invite flows will fail until they are set:\n' +
-      requiredEnvVars.map((v) => `  - ${v}`).join('\n')
-  );
+if (!botToken) {
+  console.warn('[server] TELEGRAM_BOT_TOKEN is not set; /api/me will return 503.');
+}
+if (configError) {
+  console.warn(`[server] Supabase not configured: ${configError}`);
+}
+if (!fs.existsSync(indexHtmlPath)) {
+  console.warn(`[server] ${indexHtmlPath} not found; run "npm run build" to serve the app.`);
 }
 
-// ---------------------------------------------------------------------------
-// Supabase client
-// ---------------------------------------------------------------------------
-
-let supabaseClient: SupabaseClient | null = null;
-
-function getSupabaseClient(): SupabaseClient {
-  if (!supabaseClient) {
-    // Lazy import to keep startup resilient if the package is missing.
-    const { createClient } = await import('@supabase/supabase-js');
-    supabaseClient = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
-      auth: { persistSession: false },
-      // Use the service role key only if present so server-side operations can
-      // bypass RLS during development/testing. In production you may prefer a
-      // tighter setup with RLS enabled and service role only for specific ops.
-      serviceRoleKey: supabaseConfig.serviceRoleKey,
+let supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  if (!supabaseConfig) {
+    throw new Error(configError || 'Supabase is not configured');
+  }
+  if (!supabase) {
+    supabase = createClient(supabaseConfig.url, supabaseConfig.serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
   }
-  return supabaseClient;
+  return supabase;
 }
 
 // ---------------------------------------------------------------------------
-// Static serving
+// App
 // ---------------------------------------------------------------------------
 
-const distDir = path.resolve(__dirname, 'dist');
-const indexHtmlPath = path.resolve(distDir, 'index.html');
+const app = express();
+app.disable('x-powered-by');
+app.use(express.json({ limit: '256kb' }));
 
-function ensureStaticServing() {
-  if (!fs.existsSync(distDir)) {
-    throw new Error(
-      `Cannot start server: dist/ folder not found at ${distDir}. Run "npm run build" first.`
-    );
-  }
-  if (!fs.existsSync(indexHtmlPath)) {
-    throw new Error(
-      `Cannot start server: dist/index.html not found at ${indexHtmlPath}. Run "npm run build" first.`
-    );
-  }
-}
-
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
-  if (req.path.includes('.') && req.path !== '/') {
-    const file = path.resolve(distDir, req.path);
-    if (fs.existsSync(file)) {
-      return res.sendFile(file);
-    }
-  }
+/** Pull and verify initData, or null when the request is not authenticated. */
+function readVerifiedUser(req: express.Request) {
+  const header = req.header('x-telegram-init-data');
+  if (!header || !botToken) return null;
   try {
-    res.sendFile(indexHtmlPath);
-  } catch {
-    next();
+    return verifyTelegramInitData(header, botToken);
+  } catch (error) {
+    console.warn('[auth] initData rejected:', error instanceof Error ? error.message : error);
+    return null;
   }
-});
-
-// ---------------------------------------------------------------------------
-// Health
-// ---------------------------------------------------------------------------
+}
 
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    env: {
-      hasBotToken: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-      hasSupabase: Boolean(supabaseConfig.url && supabaseConfig.anonKey),
-      hasDist: fs.existsSync(distDir),
-    },
+    hasBotToken: Boolean(botToken),
+    hasSupabase: Boolean(supabaseConfig),
+    hasBuild: fs.existsSync(indexHtmlPath),
   });
 });
 
-// ---------------------------------------------------------------------------
-// Telegram auth + invite bootstrap
-// ---------------------------------------------------------------------------
-
+/**
+ * Current user + invite state.
+ *
+ * Pass the Telegram start param as ?start=invite_<token> on the first open; the
+ * invite is attributed once and re-sending it is harmless.
+ */
 app.get('/api/me', async (req, res) => {
-  const initData = req.headers['x-telegram-init-data'];
-  const initDataRaw =
-    typeof initData === 'string'
-      ? initData
-      : Array.isArray(initData)
-        ? initData.join('')
-        : '';
+  const user = readVerifiedUser(req);
+  if (!user) {
+    return res.status(401).json({ ok: false, error: 'Invalid or missing initData' });
+  }
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  let client: SupabaseClient;
+  try {
+    client = getSupabase();
+  } catch (error) {
+    return res.status(503).json({ ok: false, error: 'Database is not configured' });
+  }
 
-  if (!initDataRaw || !botToken) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Missing initData or bot token',
+  const profile = {
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    languageCode: user.languageCode,
+    photoUrl: user.photoUrl,
+  };
+
+  try {
+    const startParam = typeof req.query.start === 'string' ? req.query.start : null;
+
+    // Attribute before reading state so a first-time invitee sees fresh counts.
+    let inviteResult: Awaited<ReturnType<typeof attributeInviteVisit>> | null = null;
+    if (startParam) {
+      inviteResult = await attributeInviteVisit(client, {
+        invitedTelegramId: user.telegramId,
+        startParam,
+        invitedProfile: profile,
+      });
+    }
+
+    const row = await upsertTelegramUser(client, user.telegramId, profile);
+    const wallet = await findOrCreateWallet(client, row.id);
+    const inviteToken = await getOrCreateInviteToken(client, row.id);
+    const claimed = await countInviteClaimsForUser(client, row.id);
+
+    return res.json({
+      ok: true,
+      user: {
+        telegramId: user.telegramId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+      },
+      wallet: { chips: wallet.chips },
+      invite: {
+        token: inviteToken,
+        link: buildInviteLink(inviteToken),
+        claimed,
+        remaining: Math.max(0, MAX_INVITE_REWARDS - claimed),
+      },
+      attributed: inviteResult,
     });
-  }
-
-  let verifiedUser;
-  try {
-    verifiedUser = await verifyTelegramInitData(initDataRaw, botToken);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Telegram initData verification failed';
-    return res.status(401).json({ ok: false, error: message });
+    console.error('[api/me] failed:', error);
+    return res.status(500).json({ ok: false, error: 'Request failed' });
   }
-
-  const db = getSupabaseClient();
-
-  let user;
-  try {
-    user = await upsertTelegramUser(db, verifiedUser.telegramId, {
-      username: verifiedUser.username,
-      firstName: verifiedUser.firstName,
-      lastName: verifiedUser.lastName,
-      languageCode: verifiedUser.languageCode,
-      photoUrl: verifiedUser.photoUrl,
-    });
-  } catch (error) {
-    console.error('[api/me] supabase upsert user failed:', error);
-    return res.status(500).json({ ok: false, error: 'Failed to create user profile' });
-  }
-
-  let inviteToken: string | null = null;
-  try {
-    inviteToken = await getOrCreateInviteToken(db, user.id);
-  } catch (error) {
-    console.error('[api/me] supabase invite token failed:', error);
-    return res.status(500).json({ ok: false, error: 'Failed to load invite link' });
-  }
-
-  let claimedCount = 0;
-  try {
-    claimedCount = await countInviteClaimsForUser(db, user.id);
-  } catch (error) {
-    console.error('[api/me] supabase count claims failed:', error);
-  }
-
-  const inviteLink =
-    inviteToken ? buildInviteLink(inviteToken) : undefined;
-
-  return res.json({
-    ok: true,
-    user: {
-      telegramId: verifiedUser.telegramId,
-      username: verifiedUser.username,
-      firstName: verifiedUser.firstName,
-      lastName: verifiedUser.lastName,
-    },
-    invite: {
-      token: inviteToken,
-      link: inviteLink,
-      claimed: claimedCount,
-      remaining: Math.max(0, 3 - claimedCount),
-    },
-  });
 });
 
 // ---------------------------------------------------------------------------
-// Serve the server bundle info if you later add a build step
+// Static Mini App + SPA fallback (never shadows /api routes)
+// ---------------------------------------------------------------------------
+
+app.use(
+  express.static(distDir, {
+    index: false,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  })
+);
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  if (!fs.existsSync(indexHtmlPath)) {
+    return res
+      .status(503)
+      .type('text/plain')
+      .send('Mini App build not found. Run "npm run build".');
+  }
+  res.setHeader('Cache-Control', 'no-cache');
+  return res.sendFile(indexHtmlPath);
+});
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ ok: false, error: 'Not found' });
+});
+
+// ---------------------------------------------------------------------------
+// Start
 // ---------------------------------------------------------------------------
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
-  console.log(`[server] CryptoFlip backend listening on http://${HOST}:${PORT}`);
-  console.log(`[server] APP_URL=${process.env.APP_URL || '(not set)'}`);
-  console.log(`[server] TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}`);
-  console.log(`[server] SUPABASE_URL=${supabaseConfig.url ? supabaseConfig.url.replace(/:\/\/[^@]+@/, '://***@') : '(not set)'}`);
+  console.log(`[server] listening on http://${HOST}:${PORT}`);
+  console.log(`[server] bot username: ${TELEGRAM_BOT_USERNAME || '(not set)'}`);
+  console.log(
+    `[server] supabase: ${supabaseConfig ? supabaseConfig.url : '(not configured)'}`
+  );
 });
-
-export {};
