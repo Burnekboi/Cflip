@@ -6,6 +6,13 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    // Vercel's Express preset serves static files from public/, so the Mini App
+    // build has to land there. There are no hand-written public assets to copy.
+    publicDir: false as const,
+    build: {
+      outDir: 'public',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

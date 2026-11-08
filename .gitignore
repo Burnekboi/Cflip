@@ -2,6 +2,8 @@ node_modules/
 build/
 dist/
 coverage/
+# Vite build output (Vercel serves this directory as static assets)
+public/
 .DS_Store
 *.log
 .env*

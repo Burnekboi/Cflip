@@ -1,8 +1,14 @@
 /**
- * CryptoFlip TMA backend (Render).
+ * CryptoFlip TMA backend.
+ *
+ * Runs two ways from this one file:
+ *  - a long-lived Node server (`npm run server`) on Render or locally
+ *  - a Vercel Function: Vercel auto-detects a root `server.ts` that default
+ *    exports an Express app, so the same routes are served at /api/* there
+ *    (express.static() is ignored; the Vite build in public/ is served by the CDN)
  *
  * Responsibilities:
- *  - serve the built Mini App from dist/
+ *  - serve the built Mini App from public/
  *  - verify Telegram WebApp initData on every API call
  *  - create/update the Telegram user and wallet in Supabase
  *  - return the user's own invite link and invite-reward status
@@ -15,7 +21,7 @@
  *   SUPABASE_ANON_KEY          project anon key
  *   SUPABASE_SERVICE_ROLE_KEY  project service role key (required, RLS bypass)
  *   APP_URL                    public URL of this deployment
- *   PORT                       provided by Render
+ *   PORT                       port for a standalone run (not used on Vercel)
  */
 
 import 'dotenv/config';
@@ -27,23 +33,25 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { validateSupabaseConfig, type SupabaseConfig } from './supabase/index.js';
-import { verifyTelegramInitData } from './lib/telegram-auth.js';
+import { validateSupabaseConfig, type SupabaseConfig } from './supabase/index';
+import { verifyTelegramInitData } from './lib/telegram-auth';
 import {
   upsertTelegramUser,
   findOrCreateWallet,
   getOrCreateInviteToken,
   countInviteClaimsForUser,
-} from './lib/supabase-server.js';
+} from './lib/supabase-server';
 import {
   attributeInviteVisit,
   MAX_INVITE_REWARDS,
-} from './lib/invite-service.js';
-import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config.js';
+} from './lib/invite-service';
+import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distDir = path.resolve(__dirname, 'dist');
-const indexHtmlPath = path.join(distDir, 'index.html');
+// The Vite build writes here. Vercel serves this directory from its CDN and
+// ignores express.static(), so it only matters for a standalone run.
+const staticDir = path.resolve(__dirname, 'public');
+const indexHtmlPath = path.join(staticDir, 'index.html');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -69,7 +77,6 @@ if (configError) {
 if (!fs.existsSync(indexHtmlPath)) {
   console.warn(`[server] ${indexHtmlPath} not found; run "npm run build" to serve the app.`);
 }
-
 let supabase: SupabaseClient | null = null;
 function getSupabase(): SupabaseClient {
   if (!supabaseConfig) {
@@ -185,7 +192,7 @@ app.get('/api/me', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.use(
-  express.static(distDir, {
+  express.static(staticDir, {
     index: false,
     setHeaders(res, filePath) {
       if (filePath.endsWith('index.html')) {
@@ -215,13 +222,21 @@ app.use('/api', (_req, res) => {
 // Start
 // ---------------------------------------------------------------------------
 
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+// On Vercel the platform invokes the exported app and owns the socket, so only
+// bind a port for a standalone run.
+const isServerless = Boolean(process.env.VERCEL);
 
-app.listen(PORT, HOST, () => {
-  console.log(`[server] listening on http://${HOST}:${PORT}`);
-  console.log(`[server] bot username: ${TELEGRAM_BOT_USERNAME || '(not set)'}`);
-  console.log(
-    `[server] supabase: ${supabaseConfig ? supabaseConfig.url : '(not configured)'}`
-  );
-});
+export default app;
+
+if (!isServerless) {
+  const PORT = Number(process.env.PORT) || 3000;
+  const HOST = process.env.HOST || '0.0.0.0';
+
+  app.listen(PORT, HOST, () => {
+    console.log(`[server] listening on http://${HOST}:${PORT}`);
+    console.log(`[server] bot username: ${TELEGRAM_BOT_USERNAME || '(not set)'}`);
+    console.log(
+      `[server] supabase: ${supabaseConfig ? supabaseConfig.url : '(not configured)'}`
+    );
+  });
+}
