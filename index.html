@@ -1,0 +1,3860 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>CryptoFlip TMA - 10-Minute Prediction Game</title>
+    <meta name="description" content="Multi-crypto 10-minute prediction game with virtual chips, live Binance pricing, PancakeSwap-style rounds, and Telegram native integration." />
+    <meta property="og:title" content="CryptoFlip TMA - 10-Minute Prediction Game" />
+    <meta property="og:description" content="Multi-crypto 10-minute prediction game with virtual chips, live Binance pricing, PancakeSwap-style rounds, and Telegram native integration." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Adsgram SDK for Rewarded Video Ads -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            colors: {
+              oled: '#0b0e14',
+              surface: '#131823',
+              surfaceAlt: '#182030',
+              borderDark: '#222b3d',
+              neonGreen: '#0ecb81',
+              neonGreenDark: '#0a8f5b',
+              neonRed: '#f6465d',
+              neonRedDark: '#b82a3d',
+              chipGold: '#f3ba2f',
+              chipGoldDark: '#c7941b',
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      :root {
+        --tg-viewport-height: 100vh;
+        --neon-green: #0ecb81;
+        --neon-red: #f6465d;
+        --chip-gold: #f3ba2f;
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+
+      body {
+        background-color: #0b0e14;
+        color: #f1f5f9;
+        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* Glow Effects */
+      .glow-green {
+        box-shadow: 0 0 20px rgba(14, 203, 129, 0.25);
+      }
+      .glow-red {
+        box-shadow: 0 0 20px rgba(246, 70, 93, 0.25);
+      }
+      .glow-gold {
+        box-shadow: 0 0 16px rgba(243, 186, 47, 0.25);
+      }
+
+      /* PancakeSwap style card shape */
+      .round-card {
+        background: linear-gradient(180deg, #161d2b 0%, #101520 100%);
+        border: 1px solid #222b3d;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Scrollbar hiding for asset tab bar */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Tactile Button Press */
+      .btn-press:active {
+        transform: scale(0.97);
+      }
+
+      /* Animated Striped Progress */
+      @keyframes moveStripes {
+        0% { background-position: 0 0; }
+        100% { background-position: 40px 0; }
+      }
+      .stripes-animated {
+        background-image: linear-gradient(
+          45deg,
+          rgba(255, 255, 255, 0.08) 25%,
+          transparent 25%,
+          transparent 50%,
+          rgba(255, 255, 255, 0.08) 50%,
+          rgba(255, 255, 255, 0.08) 75%,
+          transparent 75%,
+          transparent
+        );
+        background-size: 20px 20px;
+        animation: moveStripes 1.5s linear infinite;
+      }
+
+      /* Coin shower animation */
+      @keyframes floatUp {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-70px) scale(1.3); }
+      }
+      .payout-popup {
+        animation: floatUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      /* Modal Fade */
+      .modal-backdrop {
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+      }
+      .modal-backdrop.hidden-modal {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body class="flex flex-col min-h-screen text-slate-100 antialiased selection:bg-[#0ecb81]/30">
+
+    <!-- TOP BAR (TMA Native Contract: 3 Zones) -->
+    <header class="sticky top-0 z-40 bg-[#0b0e14]/90 backdrop-blur-md border-b border-[#1b2230] px-4 py-3 flex items-center justify-between gap-4">
+      <!-- Zone 1: Wordmark & Live Ticker Status -->
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0ecb81] to-[#f3ba2f] flex items-center justify-center font-bold text-black text-sm shadow-md shadow-[#0ecb81]/20">
+          CF
+        </div>
+        <div>
+          <div class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
+            CryptoFlip <span class="text-[10px] uppercase font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold">TMA</span>
+          </div>
+          <div class="text-[10px] text-slate-400 font-mono mt-0.5" id="header-user-tag">
+            @telegram_user
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Zone: Audio FX Toggle -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="sound-toggle-btn" class="btn-press w-8 h-8 rounded-lg bg-[#182030] border border-[#26334a] flex items-center justify-center text-slate-300 hover:text-white transition-colors" title="Toggle Audio FX">
+          <span id="sound-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN SCROLLABLE CONTENT -->
+    <main class="flex-1 w-full max-w-md mx-auto px-3.5 py-3 flex flex-col gap-3.5 pb-20">
+
+      <!-- USER TOTAL BALANCE HERO CARD -->
+      <div class="bg-[#121824] border border-[#202c40] rounded-2xl p-4 flex flex-col gap-3 shadow-lg relative overflow-hidden">
+        <!-- Top row: Header label -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-amber-500/20 text-[#f3ba2f] border border-amber-500/30 flex items-center justify-center text-sm font-bold shadow-xs">
+              🪙
+            </div>
+            <span class="text-xs font-mono uppercase tracking-wider text-slate-400 font-medium">Total Balance</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold" id="balance-status-tag">Active</span>
+          </div>
+        </div>
+
+        <!-- Middle: Big Clear Balance -->
+        <div class="flex items-baseline gap-2 pt-0.5">
+          <span id="hero-total-balance" class="text-3xl font-extrabold font-mono text-[#f3ba2f] tabular-nums tracking-tight">5,000</span>
+          <span class="text-xs font-bold text-amber-300/80 font-mono">CHIPS</span>
+        </div>
+
+        <!-- Actions: Games, Daily Chips & Share -->
+        <div class="grid grid-cols-3 gap-2">
+          <button id="hero-games-btn" class="btn-press py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors" title="Open Games">
+            <span>🎮</span>
+            <span>Games</span>
+          </button>
+          <button id="hero-refill-btn" class="btn-press py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors" title="Claim Daily Rewards">
+            <span>🎁</span>
+            <span>Daily</span>
+          </button>
+          <button id="tg-share-btn" class="btn-press py-2 rounded-xl bg-[#182335] border border-[#27384f] hover:border-[#3894e6] text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors" title="Share Win or Invite Friends">
+            <svg class="w-3.5 h-3.5 text-[#3894e6]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+            <span>Invite</span>
+          </button>
+        </div>
+
+        <!-- Bottom: Clean status strip with generous spacing -->
+        <div class="flex items-center justify-between text-xs font-mono text-slate-400 pt-2 border-t border-[#1b2536]">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="text-slate-500 shrink-0">Positions:</span>
+            <strong id="balance-positions" class="text-slate-500 font-bold tabular-nums truncate">None</strong>
+          </div>
+          <span id="position-stake" class="text-[10px] text-slate-600 shrink-0"></span>
+        </div>
+      </div>
+
+      <!-- ASSET SELECTION TAB BAR (5 rotating markets, switches every 10 minutes) -->
+      <div class="flex flex-col gap-1.5" id="crypto-tab-bar">
+        <!-- Sub-header for the 5 active markets & rotation status -->
+        <div class="flex items-center justify-between text-xs font-mono px-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-300 font-bold uppercase text-[11px] flex items-center gap-1">
+              <span>🔥</span> 5 Active Markets
+            </span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 font-semibold flex items-center gap-1" title="The 5 available markets switch automatically every 10 minutes">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span> 10m Rotation
+            </span>
+          </div>
+          <span class="text-[10px] font-mono text-slate-500">Choose 1 of 5</span>
+        </div>
+
+        <!-- Horizontal scrollable strip of the 5 active cryptos -->
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1 scroll-smooth" id="crypto-tabs-strip">
+          <!-- Rendered dynamically via JS with Rank & Live Indicator -->
+        </div>
+      </div>
+
+      <!-- 10-MINUTE ROUND HERO CARD (PancakeSwap-Style Prediction Arena) -->
+      <div class="round-card p-4 flex flex-col gap-3 relative">
+        <!-- Background Ambient Glow -->
+        <div id="ambient-glow" class="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-[#0ecb81]/10 blur-3xl pointer-events-none transition-colors duration-700"></div>
+
+        <!-- Card Top Bar: Round ID + Status Badge + Timer -->
+        <div class="flex items-center justify-between text-xs font-medium z-10 border-b border-[#222b3d] pb-2.5">
+          <div class="flex items-center gap-1">
+            <span class="text-slate-400 font-mono text-[11px]" id="round-number-tag">Round #1042</span>
+            <span id="round-phase-badge" class="-ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              🟢 Betting Open
+            </span>
+          </div>
+
+          <!-- Countdown Display -->
+          <div class="flex items-center gap-1.5 font-mono text-xs">
+            <span class="text-slate-400 text-[11px]" id="timer-desc">Closes in:</span>
+            <span id="round-timer-display" class="font-bold text-amber-400 tabular-nums text-sm">02:00</span>
+          </div>
+        </div>
+
+        <!-- Phase Progress Bar -->
+        <div class="w-full bg-[#0c1017] rounded-full h-2 overflow-hidden border border-[#1b2230] relative">
+          <div id="round-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-[#f6465d] transition-all duration-300 stripes-animated" style="width: 100%;"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-mono text-slate-500 -mt-1.5 px-0.5">
+          <span>00:00 (Lock)</span>
+          <span id="lock-label-pos">02:00 (Bets close)</span>
+          <span>10:00 (Settle)</span>
+        </div>
+
+        <!-- LIVE 2D CANVAS PREDICTION ENGINE -->
+        <div class="relative w-full rounded-xl overflow-hidden border border-[#222b3d] bg-[#0c1017]">
+          <!-- Real-Time Floating Price Overlay -->
+          <div class="absolute top-2.5 left-3 z-10 pointer-events-none">
+            <div class="text-[10px] uppercase font-mono text-slate-400 flex items-center gap-1">
+              <span id="current-crypto-symbol">BTC/USDT</span>
+              <span class="text-emerald-400 text-[9px]">● Live REST</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="live-price-text" class="text-xl font-bold font-mono text-white tabular-nums tracking-tight">$88,450.00</span>
+              <span id="price-delta-badge" class="text-xs font-mono font-semibold text-emerald-400 tabular-nums">+0.42%</span>
+            </div>
+          </div>
+
+          <!-- Lock Price Marker in Card Overlay -->
+          <div class="absolute top-2.5 right-3 z-10 text-right pointer-events-none">
+            <div class="text-[10px] uppercase font-mono text-slate-400">Lock Price (Open)</div>
+            <div id="lock-price-text" class="text-xs font-bold font-mono text-slate-300 tabular-nums">Pending Lock</div>
+          </div>
+
+          <!-- The HTML5 2D Canvas -->
+          <canvas id="predictionCanvas" class="w-full h-44 block"></canvas>
+
+          <!-- Status Banner inside canvas for Locked / Settling states -->
+          <div id="canvas-overlay-message" class="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300 opacity-0">
+            <span id="overlay-title" class="text-sm font-bold text-white tracking-wide">PREDICTION LOCKED</span>
+            <span id="overlay-sub" class="text-xs text-slate-300 font-mono mt-1">Tracking asset price to settlement...</span>
+          </div>
+        </div>
+
+        <!-- POOL MULTIPLIERS & RATIO BAR -->
+        <div class="bg-[#0e131d] rounded-xl p-2.5 border border-[#1b2333] flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <div class="flex items-center gap-1.5">
+              <span class="text-emerald-400 font-bold">UP <span id="up-payout-mult" class="text-white text-[13px]">1.85x</span></span>
+              <span class="text-[10px] text-slate-500">Payout</span>
+            </div>
+            <div class="text-[11px] text-slate-400">
+              Total Pool: <span id="total-pool-display" class="text-[#f3ba2f] font-bold tabular-nums">24,500</span> chips
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] text-slate-500">Payout</span>
+              <span class="text-[#f6465d] font-bold"><span id="down-payout-mult" class="text-white text-[13px]">2.15x</span> DOWN</span>
+            </div>
+          </div>
+
+          <!-- Ratio visual bar -->
+          <div class="w-full h-2 rounded-full overflow-hidden flex bg-[#161d2b]">
+            <div id="pool-up-bar" class="h-full bg-[#0ecb81] transition-all duration-300" style="width: 55%;"></div>
+            <div id="pool-down-bar" class="h-full bg-[#f6465d] transition-all duration-300" style="width: 45%;"></div>
+          </div>
+          <div class="flex justify-between text-[10px] font-mono text-slate-400 px-0.5">
+            <span id="pool-up-percent">55% UP</span>
+            <span id="pool-down-percent">45% DOWN</span>
+          </div>
+        </div>
+
+        <!-- USER ACTIVE BET INDICATOR (If bet placed in current round) -->
+        <div id="user-bet-status-banner" class="hidden rounded-xl p-2.5 border text-xs font-mono flex items-center justify-between transition-all">
+          <div class="flex items-center gap-2">
+            <span id="user-bet-icon" class="text-base">🚀</span>
+            <div>
+              <div class="text-white font-bold" id="user-bet-title">You entered UP</div>
+              <div class="text-[10px] text-slate-400" id="user-bet-subtitle">500 chips · Win: 925 chips</div>
+            </div>
+          </div>
+          <div id="user-bet-delta" class="text-right font-bold text-xs text-emerald-400">
+            IN PROFIT
+          </div>
+        </div>
+
+        <!-- ENTER PREDICTION BUTTONS (UP vs DOWN) -->
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <!-- UP BUTTON -->
+          <button id="btn-enter-up" class="btn-press group relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#0ecb81] to-[#0a9a61] p-3 text-left transition-all duration-200 border border-[#1cd991] shadow-lg shadow-[#0ecb81]/20 disabled:opacity-50 disabled:pointer-events-none">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-sm tracking-wide text-black flex items-center gap-1">
+                ENTER UP ▲
+              </span>
+              <span class="font-mono text-xs font-bold text-black/80" id="btn-up-mult">1.85x</span>
+            </div>
+            <div class="text-[11px] font-medium text-black/70 mt-1">
+              Close &gt; Lock Price
+            </div>
+          </button>
+
+          <!-- DOWN BUTTON -->
+          <button id="btn-enter-down" class="btn-press group relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#f6465d] to-[#be2b3f] p-3 text-left transition-all duration-200 border border-[#ff6175] shadow-lg shadow-[#f6465d]/20 disabled:opacity-50 disabled:pointer-events-none">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-sm tracking-wide text-white flex items-center gap-1">
+                ENTER DOWN ▼
+              </span>
+              <span class="font-mono text-xs font-bold text-white/90" id="btn-down-mult">2.15x</span>
+            </div>
+            <div class="text-[11px] font-medium text-white/80 mt-1">
+              Close &lt; Lock Price
+            </div>
+          </button>
+        </div>
+
+        <!-- CHIP DENOMINATION SELECTOR -->
+        <div class="flex flex-col gap-2 pt-1 border-t border-[#1b2333]">
+          <div class="flex items-center justify-between text-[11px] font-medium text-slate-400">
+            <span>Bet Size: <strong id="selected-bet-display" class="text-[#f3ba2f] font-bold font-mono">500</strong></span>
+            <span class="font-mono text-slate-300">Balance: <strong id="bet-area-balance" class="text-emerald-400 font-bold tabular-nums">5,000</strong> chips</span>
+          </div>
+
+          <div class="grid grid-cols-6 gap-1.5 font-mono text-xs font-bold" id="chip-buttons-container">
+            <button data-amount="100" class="chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white transition-all text-center">100</button>
+            <button data-amount="250" class="chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white transition-all text-center">250</button>
+            <button data-amount="500" class="chip-btn btn-press py-2 rounded-xl bg-[#1d273a] border border-[#f3ba2f] text-[#f3ba2f] transition-all text-center shadow-xs">500</button>
+            <button data-amount="1000" class="chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white transition-all text-center">1K</button>
+            <button data-amount="2500" class="chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white transition-all text-center">2.5K</button>
+            <button data-amount="MAX" class="chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-amber-400 hover:text-amber-300 transition-all text-center">MAX</button>
+          </div>
+        </div>
+
+      </div>
+
+
+      <!-- PERFORMANCE STATS & USER RECORD -->
+      <div class="bg-[#121722] rounded-2xl p-3.5 border border-[#1f2838] flex flex-col gap-2.5">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+          <span class="flex items-center gap-1.5">
+            <span>📊</span> Your Prediction Record
+          </span>
+          <span class="text-[11px] text-slate-400 font-mono" id="stat-rounds-count">0 Rounds Played</span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 text-center font-mono">
+          <div class="bg-[#0b0e14] p-2 rounded-xl border border-[#1b2333]">
+            <div class="text-[10px] text-slate-400">Win Rate</div>
+            <div id="stat-win-rate" class="text-xs font-bold text-emerald-400 mt-0.5 tabular-nums">0.0%</div>
+          </div>
+          <div class="bg-[#0b0e14] p-2 rounded-xl border border-[#1b2333]">
+            <div class="text-[10px] text-slate-400">Wins/Loss</div>
+            <div id="stat-win-loss" class="text-xs font-bold text-slate-200 mt-0.5 tabular-nums">0W - 0L</div>
+          </div>
+          <div class="bg-[#0b0e14] p-2 rounded-xl border border-[#1b2333]">
+            <div class="text-[10px] text-slate-400">Streak</div>
+            <div id="stat-streak" class="text-xs font-bold text-amber-400 mt-0.5 tabular-nums">0 🔥</div>
+          </div>
+          <div class="bg-[#0b0e14] p-2 rounded-xl border border-[#1b2333]">
+            <div class="text-[10px] text-slate-400">Net PnL</div>
+            <div id="stat-pnl" class="text-xs font-bold text-slate-300 mt-0.5 tabular-nums">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROUND HISTORY CAROUSEL / FEED -->
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-300 px-1">
+          <span class="flex items-center gap-1.5">
+            <span>⏱️</span> Recent Settled Rounds
+          </span>
+          <button id="clear-history-btn" class="text-[10px] text-slate-500 hover:text-slate-400 font-mono">
+            Reset Stats
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-2" id="round-history-list">
+          <div class="bg-[#121723] rounded-xl p-3 border border-[#20293a] flex items-center justify-between font-mono text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">UP ▲</span>
+              <div>
+                <div class="font-sans font-bold text-white text-xs">Round #1041 · BTC</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  Lock: $88,240.50 → Close: $88,510.20
+                </div>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-emerald-400 font-bold text-xs">+925 chips 🟢</span>
+              <div class="text-[10px] text-slate-500 mt-0.5">1.85x payout · 10m ago</div>
+            </div>
+          </div>
+
+          <div class="bg-[#121723] rounded-xl p-3 border border-[#20293a] flex items-center justify-between font-mono text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-[#f6465d] font-bold bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[10px]">DOWN ▼</span>
+              <div>
+                <div class="font-sans font-bold text-white text-xs">Round #1040 · ETH</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  Lock: $2,695.80 → Close: $2,682.40
+                </div>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-500 text-[10px]">No Bet Placed</span>
+              <div class="text-[10px] text-slate-500 mt-0.5">2.15x payout · 20m ago</div>
+            </div>
+          </div>
+
+          <div class="bg-[#121723] rounded-xl p-3 border border-[#20293a] flex items-center justify-between font-mono text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">UP ▲</span>
+              <div>
+                <div class="font-sans font-bold text-white text-xs">Round #1039 · SOL</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  Lock: $184.20 → Close: $186.75
+                </div>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-emerald-400 font-bold text-xs">+440 chips 🟢</span>
+              <div class="text-[10px] text-slate-500 mt-0.5">1.76x payout · 30m ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </main>
+
+    <!-- FIXED BOTTOM TAB BAR (Thumb ergonomics) -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-[#0b0e14]/95 backdrop-blur-md border-t border-[#1b2230] py-2 px-2 flex items-center justify-around max-w-md mx-auto">
+      <button class="nav-tab active flex flex-col items-center text-emerald-400" data-view="game">
+        <span class="text-lg">📈</span>
+        <span class="text-[10px] font-semibold mt-0.5 tracking-tight">Prediction</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="history">
+        <span class="text-lg">📜</span>
+        <span class="text-[10px] font-medium mt-0.5 tracking-tight">History</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="leaderboard">
+        <span class="text-lg">🏆</span>
+        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Ranks</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="missions">
+        <span class="text-lg">🎯</span>
+        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Mission</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="faucet">
+        <span class="text-lg">🎁</span>
+        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Daily Chips</span>
+      </button>
+    </nav>
+
+    <!-- MODAL: DAILY REWARDS (DAILY CLAIM + REWARDED ADS) -->
+    <div id="faucet-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-sm p-5 flex flex-col items-center text-center gap-3 relative shadow-2xl">
+        <button id="close-faucet-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+        
+        <div class="w-16 h-16 rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20">
+          🎁
+        </div>
+
+        <div>
+          <h3 class="text-lg font-bold text-white">Daily Rewards</h3>
+          <p class="text-xs text-slate-400 mt-1">Claim your daily <span class="text-[#f3ba2f] font-bold">+1,000 chips</span> and watch up to <span class="text-[#f3ba2f] font-bold">3 sponsor ads</span> for extra chips.</p>
+        </div>
+
+        <!-- Watch Ad (max 3 per day) -->
+        <div class="w-full flex flex-col gap-1.5">
+          <button id="watch-ad-btn" class="btn-press w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 font-bold text-black text-sm shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none">
+            <span>📺</span>
+            <span id="watch-ad-label">Watch Sponsor Ad (+1,000)</span>
+          </button>
+          <div class="flex items-center justify-between text-[10px] font-mono px-1">
+            <span class="text-slate-500">Max 3 ads per day</span>
+            <span id="ad-remaining-label" class="text-emerald-400 font-semibold">3 / 3 left</span>
+          </div>
+        </div>
+
+        <!-- Daily Reward (below the ad button) -->
+        <div class="w-full flex flex-col gap-1.5">
+          <button id="claim-daily-btn" class="btn-press w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 font-bold text-black text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none">
+            <span>🎁</span>
+            <span id="claim-daily-label">Claim Daily Reward (+1,000)</span>
+          </button>
+          <div class="text-[10px] font-mono text-slate-500" id="daily-reset-label">Available once every day</div>
+        </div>
+
+        <div class="text-[10px] text-slate-500 flex items-center gap-1 font-mono">
+          <span>Powered by</span>
+          <span class="text-slate-400 font-semibold">Adsgram Network</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: GAMES -->
+    <div id="games-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-md p-4 flex flex-col gap-3 relative shadow-2xl max-h-[92vh] overflow-y-auto no-scrollbar">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎮</span>
+            <h3 class="text-base font-bold text-white">Games</h3>
+          </div>
+          <button id="close-games-modal" class="text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+        </div>
+
+        <!-- ROCKET CRASH -->
+        <div class="rounded-2xl border border-[#243044] bg-[#0b0f18] overflow-hidden flex flex-col">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-3 py-2 border-b border-[#1b2333] bg-[#101623]">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🚀</span>
+              <div>
+                <div class="text-xs font-bold text-white leading-none">RocketCrash</div>
+                <div class="text-[9px] font-mono text-slate-500 mt-0.5">Cash out before it crashes</div>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Chips</div>
+              <div class="text-sm font-bold font-mono text-emerald-400 tabular-nums" id="rc-balance">5,000</div>
+            </div>
+          </div>
+
+          <!-- Crash history bar -->
+          <div class="flex items-center gap-1 px-2 py-1.5 overflow-x-auto no-scrollbar border-b border-[#1b2333] bg-[#0d121c] min-h-[30px]" id="rc-history">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Canvas stage -->
+          <div class="relative w-full bg-[#070a12]" id="rc-stage">
+            <canvas id="rc-canvas" class="block w-full h-[210px]"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div id="rc-multiplier" class="text-4xl font-extrabold font-mono text-white tabular-nums drop-shadow-[0_0_18px_rgba(16,185,129,0.35)] transition-transform duration-100 will-change-transform">1.00x</div>
+              <div id="rc-status" class="text-[10px] font-mono text-slate-400 mt-1">Starting in 5s…</div>
+            </div>
+          </div>
+
+          <!-- Bet panel -->
+          <div class="p-2.5 flex flex-col gap-2 bg-[#0d121c] border-t border-[#1b2333]">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex flex-col gap-1">
+                <span class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Bet</span>
+                <input id="rc-bet" type="number" min="1" step="1" inputmode="decimal" value="10"
+                  class="w-full bg-[#131a26] border border-[#243044] focus:border-amber-400/60 focus:outline-none rounded-lg px-2 py-1.5 text-xs font-mono text-white tabular-nums" />
+              </label>
+              <label class="flex flex-col gap-1">
+                <span class="flex items-center justify-between gap-1">
+                  <span class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Auto cash-out</span>
+                  <input id="rc-auto-toggle" type="checkbox" checked title="Enable auto cash-out"
+                    class="h-3.5 w-3.5 accent-emerald-500 cursor-pointer" />
+                </span>
+                <input id="rc-auto" type="number" min="1.01" step="0.01" inputmode="decimal" value="2.00"
+                  class="w-full bg-[#131a26] border border-[#243044] focus:border-amber-400/60 focus:outline-none rounded-lg px-2 py-1.5 text-xs font-mono text-white tabular-nums transition-opacity" />
+              </label>
+            </div>
+
+            <div class="grid grid-cols-4 gap-1.5">
+              <button data-rc-quick="min" class="btn-press py-1.5 rounded-lg bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white text-[11px] font-bold transition-colors">Min</button>
+              <button data-rc-quick="half" class="btn-press py-1.5 rounded-lg bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white text-[11px] font-bold transition-colors">Half</button>
+              <button data-rc-quick="double" class="btn-press py-1.5 rounded-lg bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white text-[11px] font-bold transition-colors">Double</button>
+              <button data-rc-quick="max" class="btn-press py-1.5 rounded-lg bg-[#141b27] border border-[#232e42] text-amber-400 hover:text-amber-300 text-[11px] font-bold transition-colors">Max</button>
+            </div>
+
+            <button id="rc-action" class="btn-press w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-black font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40 disabled:pointer-events-none">
+              Place Bet
+            </button>
+
+            <div class="flex items-center justify-between text-[9px] font-mono text-slate-500">
+              <span>Rounds <strong id="rc-rounds" class="text-slate-300">0</strong> · <strong id="rc-wl" class="text-slate-300">0W/0L</strong> · Best <strong id="rc-high" class="text-amber-300">1.00x</strong></span>
+              <span class="text-slate-600">CryptoFlip wallet</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="close-games-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL: LEADERBOARD -->
+    <div id="ranks-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-sm p-5 flex flex-col gap-3 relative shadow-2xl max-h-[85vh] overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🏆</span>
+            <h3 class="text-base font-bold text-white">Top Forecasters</h3>
+          </div>
+          <button id="close-ranks-modal" class="text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+        </div>
+
+        <p class="text-xs text-slate-400">Weekly Telegram crypto prediction leaderboard.</p>
+
+        <div class="flex flex-col gap-2 overflow-y-auto max-h-72 pr-1 no-scrollbar text-xs font-mono">
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-amber-400">#1 👑</span>
+              <span class="text-white font-sans font-semibold">SatoshiWhale</span>
+            </div>
+            <span class="text-amber-300 font-bold">142,500 🪙</span>
+          </div>
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 border border-[#243044]">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-300">#2 🥈</span>
+              <span class="text-white font-sans font-semibold">SolanaDegen</span>
+            </div>
+            <span class="text-slate-300 font-bold">98,200 🪙</span>
+          </div>
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 border border-[#243044]">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-amber-700">#3 🥉</span>
+              <span class="text-white font-sans font-semibold">CryptoNinja</span>
+            </div>
+            <span class="text-slate-300 font-bold">76,400 🪙</span>
+          </div>
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-emerald-400">#12 (You)</span>
+              <span class="text-white font-sans font-semibold" id="ranks-user-name">You</span>
+            </div>
+            <span class="text-emerald-400 font-bold" id="ranks-user-chips">5,000 🪙</span>
+          </div>
+        </div>
+
+        <button id="close-ranks-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL: MISSIONS -->
+    <div id="missions-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-sm p-5 flex flex-col gap-3 relative shadow-2xl max-h-[88vh] overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🎯</span>
+            <div>
+              <h3 class="text-base font-bold text-white leading-none">Missions</h3>
+              <p class="text-[11px] text-slate-400 font-mono mt-1">Hit the targets, claim chips once</p>
+            </div>
+          </div>
+          <button id="close-missions-modal" class="text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+        </div>
+
+        <div class="flex flex-col gap-2 overflow-y-auto max-h-[60vh] pr-1 no-scrollbar" id="missions-list">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <button id="close-missions-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL: SETTLEMENT CELEBRATION OVERLAY -->
+    <div id="win-celebration-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-[#141b29] border border-[#283852] rounded-3xl w-full max-w-xs p-6 flex flex-col items-center text-center gap-3 relative shadow-2xl">
+        <div id="celebration-icon" class="text-5xl animate-bounce">🎉</div>
+        <h3 id="celebration-title" class="text-xl font-extrabold text-white">ROUND WON!</h3>
+        <p id="celebration-desc" class="text-xs text-slate-300">Your prediction on BTC UP was accurate!</p>
+        
+        <div class="w-full bg-[#0c1017] p-3 rounded-2xl border border-[#1d273a] flex flex-col gap-1 font-mono">
+          <div class="text-[11px] text-slate-400">Total Payout:</div>
+          <div id="celebration-chips" class="text-2xl font-extrabold text-emerald-400 tabular-nums">+1,850 CHIPS</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 w-full pt-1">
+          <button id="celebration-share-btn" class="btn-press py-2.5 rounded-xl bg-[#2aabee] text-white font-bold text-xs flex items-center justify-center gap-1">
+            <span>🚀</span> Share
+          </button>
+          <button id="celebration-dismiss-btn" class="btn-press py-2.5 rounded-xl bg-[#1d2638] text-slate-200 font-semibold text-xs">
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: INVITE LINK (Telegram Mini App share link for friends) -->
+    <div id="invite-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-sm p-5 flex flex-col gap-4 relative shadow-2xl">
+        <button id="close-invite-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+
+        <div class="w-14 h-14 rounded-2xl bg-[#2aabee]/20 border border-[#2aabee]/30 flex items-center justify-center text-2xl shadow-lg shadow-[#2aabee]/20">
+          <svg class="w-7 h-7 text-[#3894e6]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        </div>
+
+        <div>
+          <h3 class="text-base font-bold text-white">Invite Friends</h3>
+          <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+            Send your CryptoFlip invite link. When friends join through it, they land in your CryptoFlip Telegram Mini App.
+            You earn <strong class="text-[#f3ba2f] font-bold">+1,000 chips</strong> per invite, up to <strong class="text-[#f3ba2f] font-bold">3 invites</strong>.
+          </p>
+        </div>
+
+        <!-- Invite link box -->
+        <div class="flex flex-col gap-2">
+          <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Your invite link</label>
+          <div class="flex gap-2">
+            <input
+              id="invite-link-input"
+              type="text"
+              readonly
+              class="flex-1 bg-[#0b0e14] border border-[#232e42] rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 break-all select-all"
+              placeholder="Invite link will appear here"
+            />
+            <button id="copy-invite-link-btn" class="btn-press shrink-0 py-2.5 px-3 rounded-xl bg-[#182030] border border-[#26334a] text-slate-200 hover:text-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Copy invite link">
+              <span id="copy-invite-label">Copy</span>
+            </button>
+          </div>
+          <div id="invite-copy-toast" class="hidden text-[10px] font-mono text-emerald-400 font-semibold">Link copied</div>
+        </div>
+
+        <!-- Share to Telegram -->
+        <button id="share-invite-to-tg-btn" class="btn-press w-full py-3 rounded-xl bg-gradient-to-r from-[#2aabee] to-[#2599d6] text-white font-bold text-sm shadow-lg shadow-[#2aabee]/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none">
+          <span>🚀</span> Share on Telegram
+        </button>
+
+        <!-- Invite reward progress -->
+        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+          <span>Invite rewards: <strong id="invite-reward-status" class="text-[#f3ba2f] font-bold">0 / 3 claimed</strong></span>
+          <button id="claim-invite-reward-btn" class="btn-press shrink-0 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold text-[10px] shadow-md shadow-amber-500/20 disabled:opacity-40 disabled:pointer-events-none">
+            Claim +1,000
+          </button>
+        </div>
+
+        <!-- Pending / not-ready state -->
+        <div id="invite-pending-note" class="text-[10px] font-mono text-slate-500 text-center">
+          Invite links are ready when the Mini App is deployed.
+        </div>
+
+        <div id="invite-setup-note" class="text-[10px] font-mono text-slate-500 text-center hidden">
+          The invite link is generated once the Mini App has a live URL.
+        </div>
+      </div>
+    </div>
+
+    <!-- APPLICATION LOGIC & CANVAS ENGINE SCRIPT -->
+    <script>
+      (function () {
+        'use strict';
+
+        // ==========================================
+        // 1. TELEGRAM WEBAPP SDK CONTROLLER
+        // ==========================================
+        const TG = window.Telegram?.WebApp;
+
+        // Mini App invite link — set at runtime/server when the Mini App is deployed.
+        // For now this stays empty; the invite modal is built around it so the flow
+        // is ready without requiring the link today.
+        //
+        // When deploying the Mini App, set this once from:
+        //   - your backend (server-rendered into the page), or
+        //   - Telegram launch params / initData, or
+        //   - a runtime call to setInviteLink(...) below.
+        let INVITE_LINK = '';
+
+        /**
+         * Set the user's invite link at runtime.
+         * Call this after the Mini App URL is known (server render, config fetch,
+         * or Telegram deep-link params). It updates the modal immediately and
+         * persists the link on the device so a reload keeps the same invite link.
+         */
+        function setInviteLink(link) {
+          INVITE_LINK = (link && link.trim()) || '';
+          try {
+            if (INVITE_LINK) {
+              localStorage.setItem('cryptoFlip_invite_link', INVITE_LINK);
+            } else {
+              localStorage.removeItem('cryptoFlip_invite_link');
+            }
+          } catch (e) {
+            console.warn('Could not persist invite link:', e);
+          }
+          InviteModal.render();
+        }
+
+        // Backend bootstrap state
+        let suppressInviteApiUntil = 0;
+
+        /**
+         * Backend API helper for the verified Telegram path.
+         * Right now the only read path is /api/me, which returns the verified
+         //  user's invite link and invite-reward status once Telegram initData is
+         //  present.
+         */
+        const BackendApi = {
+          async me() {
+            const initData = TG && TG.initData ? TG.initData : null;
+            if (!initData && typeof window !== 'undefined') {
+              return null;
+            }
+
+            const headers: Record<string, string> = {};
+            if (initData) {
+              headers['X-Telegram-Init-Data'] = initData;
+            }
+
+            const res = await fetch('/api/me', {
+              headers,
+            });
+            if (!res.ok) {
+              return null;
+            }
+            return res.json().catch(() => null);
+          },
+        };
+
+        /**
+         * Apply the verified invite link from the backend to the UI.
+         */
+        function applyBackendInvite(data: unknown) {
+          if (!data || typeof data !== 'object') return;
+          const d = data as Record<string, any>;
+          if (d && d.ok && typeof d.invite === 'object' && d.invite) {
+            const link = d.invite.link || '';
+            if (link) {
+              setInviteLink(link);
+            }
+          }
+        }
+
+        /**
+         * Fetch the verified invite link from the backend once Telegram is ready.
+         * This runs after the initial UI is laid out so the invite modal can show the
+         //  real link immediately once it exists.
+         */
+        async function bootstrapBackendInvite() {
+          const now = Date.now();
+          if (now < suppressInviteApiUntil) return;
+          try {
+            const data = await BackendApi.me();
+            if (data && data.ok && data.invite && data.invite.link) {
+              setInviteLink(data.invite.link);
+            }
+          } catch (e) {
+            console.warn('Backend invite bootstrap failed:', e);
+          }
+        }
+
+        let isTelegramEnv = Boolean(TG && TG.initData);
+
+        const TelegramController = {
+          init() {
+            if (TG) {
+              try {
+                TG.ready();
+                TG.expand();
+                if (TG.setHeaderColor) TG.setHeaderColor('#0b0e14');
+                if (TG.setBackgroundColor) TG.setBackgroundColor('#0b0e14');
+                if (TG.enableClosingConfirmation) TG.enableClosingConfirmation();
+              } catch (e) {
+                console.warn('Telegram WebApp setup error:', e);
+              }
+            }
+
+            const userName = TG?.initDataUnsafe?.user?.first_name 
+              ? `${TG.initDataUnsafe.user.first_name}` 
+              : 'CryptoTrader';
+            const userHandle = TG?.initDataUnsafe?.user?.username 
+              ? `@${TG.initDataUnsafe.user.username}` 
+              : '@tma_user';
+
+            const userTagEl = document.getElementById('header-user-tag');
+            if (userTagEl) userTagEl.textContent = userHandle;
+
+            const ranksUserEl = document.getElementById('ranks-user-name');
+            if (ranksUserEl) ranksUserEl.textContent = userName;
+          },
+
+          haptic(type = 'light') {
+            if (TG?.HapticFeedback) {
+              try {
+                if (type === 'selection') {
+                  TG.HapticFeedback.selectionChanged();
+                } else if (type === 'success' || type === 'error' || type === 'warning') {
+                  TG.HapticFeedback.notificationOccurred(type);
+                } else {
+                  TG.HapticFeedback.impactOccurred(type); // 'light' | 'medium' | 'heavy'
+                }
+              } catch (e) {
+                console.warn('Haptic feedback error:', e);
+              }
+            } else if (navigator.vibrate) {
+              const vibMap = { light: 10, medium: 25, heavy: 45, success: [15, 30, 20] };
+              navigator.vibrate(vibMap[type] || 15);
+            }
+          },
+
+          shareWin(text) {
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(text)}`;
+            if (TG?.openTelegramLink) {
+              TG.openTelegramLink(shareUrl);
+            } else {
+              window.open(shareUrl, '_blank');
+            }
+          }
+        };
+
+        // ==========================================
+        // INVITE LINK MODAL (ready for Mini App deployment)
+        // ==========================================
+        const InviteModal = {
+          modalEl: () => document.getElementById('invite-modal'),
+          inputEl: () => document.getElementById('invite-link-input'),
+          copyBtnEl: () => document.getElementById('copy-invite-link-btn'),
+          copyLabelEl: () => document.getElementById('copy-invite-label'),
+          shareBtnEl: () => document.getElementById('share-invite-to-tg-btn'),
+          toastEl: () => document.getElementById('invite-copy-toast'),
+          pendingNoteEl: () => document.getElementById('invite-pending-note'),
+          setupNoteEl: () => document.getElementById('invite-setup-note'),
+
+          isReady() {
+            return Boolean(INVITE_LINK && INVITE_LINK.trim().length > 0);
+          },
+
+          render() {
+            const input = this.inputEl();
+            if (!input) return;
+            if (this.isReady()) {
+              input.value = INVITE_LINK;
+              input.placeholder = '';
+              this.copyBtnEl()?.removeAttribute('disabled');
+              this.shareBtnEl()?.removeAttribute('disabled');
+              this.pendingNoteEl()?.classList.add('hidden');
+              this.setupNoteEl()?.classList.add('hidden');
+            } else {
+              input.value = '';
+              input.placeholder = 'Invite link will appear here';
+              this.copyBtnEl()?.setAttribute('disabled', '');
+              this.shareBtnEl()?.setAttribute('disabled', '');
+              this.pendingNoteEl()?.classList.remove('hidden');
+              this.setupNoteEl()?.classList.remove('hidden');
+            }
+          },
+
+          open() {
+            const modal = this.modalEl();
+            if (!modal) return;
+            this.render();
+            // Keep invite reward progress in sync every time the modal opens.
+            try { Wallet.syncRewardsUI && Wallet.syncRewardsUI(); } catch (e) {}
+            modal.classList.remove('hidden-modal');
+            TG?.openLink?.();
+          },
+
+          close() {
+            const modal = this.modalEl();
+            if (!modal) return;
+            modal.classList.add('hidden-modal');
+          },
+
+          copyLink() {
+            if (!this.isReady()) return;
+            const input = this.inputEl();
+            if (!input) return;
+            const text = input.value;
+            if (!text) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(
+                () => this.showCopied(),
+                () => this.fallbackCopy(text)
+              );
+            } else {
+              this.fallbackCopy(text);
+            }
+            TelegramController.haptic('success');
+          },
+
+          fallbackCopy(text) {
+            const input = this.inputEl();
+            if (!input) return;
+            input.select();
+            input.setSelectionRange(0, 99999);
+            try {
+              document.execCommand('copy');
+              this.showCopied();
+            } catch (e) {
+              console.warn('Copy invite link failed:', e);
+            }
+          },
+
+          showCopied() {
+            const label = this.copyLabelEl();
+            const toast = this.toastEl();
+            if (label) label.textContent = 'Copied';
+            if (toast) {
+              toast.classList.remove('hidden');
+              setTimeout(() => toast.classList.add('hidden'), 1400);
+            }
+            setTimeout(() => {
+              if (label) label.textContent = 'Copy';
+            }, 1400);
+          },
+
+          shareToTelegram() {
+            if (!this.isReady()) return;
+            const link = INVITE_LINK;
+            const appTitle = 'CryptoFlip TMA';
+            const shareText = `${appTitle} invite link: ${link}`;
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`;
+
+            if (TG?.openTelegramLink) {
+              TG.openTelegramLink(shareUrl);
+            } else {
+              window.open(shareUrl, '_blank', 'noopener');
+            }
+            TelegramController.haptic('light');
+          },
+        };
+
+        function openInviteModal() {
+          InviteModal.open();
+        }
+
+        function closeInviteModal() {
+          InviteModal.close();
+        }
+
+        // ==========================================
+        // 2. SYNTHESIZED WEB AUDIO API FX CONTROLLER
+        // ==========================================
+        const AudioFX = {
+          enabled: true,
+          ctx: null,
+
+          init() {
+            try {
+              const AudioContext = window.AudioContext || window.webkitAudioContext;
+              if (AudioContext) {
+                this.ctx = new AudioContext();
+              }
+            } catch (e) {
+              console.warn('Web Audio API not supported', e);
+            }
+          },
+
+          ensureContext() {
+            if (this.ctx && this.ctx.state === 'suspended') {
+              this.ctx.resume();
+            }
+          },
+
+          playTone(freq, type, duration, gainVal = 0.15) {
+            if (!this.enabled || !this.ctx) return;
+            try {
+              this.ensureContext();
+              const osc = this.ctx.createOscillator();
+              const gain = this.ctx.createGain();
+              osc.type = type;
+              osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+              gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+              osc.connect(gain);
+              gain.connect(this.ctx.destination);
+              osc.start();
+              osc.stop(this.ctx.currentTime + duration);
+            } catch (e) {}
+          },
+
+          click() {
+            this.playTone(600, 'sine', 0.04, 0.1);
+          },
+
+          betPlaced() {
+            if (!this.enabled || !this.ctx) return;
+            this.ensureContext();
+            this.playTone(440, 'triangle', 0.08, 0.15);
+            setTimeout(() => this.playTone(880, 'sine', 0.12, 0.15), 60);
+          },
+
+          countdownTick() {
+            this.playTone(750, 'square', 0.03, 0.05);
+          },
+
+          lockTone() {
+            this.playTone(320, 'sawtooth', 0.25, 0.12);
+          },
+
+          winFanfare() {
+            if (!this.enabled || !this.ctx) return;
+            this.ensureContext();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C E G C
+            notes.forEach((freq, idx) => {
+              setTimeout(() => this.playTone(freq, 'sine', 0.2, 0.2), idx * 90);
+            });
+          },
+
+          lossTone() {
+            if (!this.enabled || !this.ctx) return;
+            this.ensureContext();
+            this.playTone(350, 'sawtooth', 0.2, 0.15);
+            setTimeout(() => this.playTone(260, 'sawtooth', 0.35, 0.15), 180);
+          }
+        };
+
+        // ==========================================
+        // 3. ZERO-COST BINANCE REST PRICE SERVICE
+        // ==========================================
+        // Top 100 Cryptocurrencies tradeable against USDT on Binance REST API
+        // Only 5 of them are offered at a time; the set rotates every 10-minute round
+        const ASSETS = [
+          { rank: 1, symbol: 'BTCUSDT', name: 'BTC', fullName: 'Bitcoin', pair: 'BTC/USDT', icon: '₿', decimals: 2, basePrice: 88500, cat: 'HOT' },
+          { rank: 2, symbol: 'ETHUSDT', name: 'ETH', fullName: 'Ethereum', pair: 'ETH/USDT', icon: 'Ξ', decimals: 2, basePrice: 2680, cat: 'HOT' },
+          { rank: 3, symbol: 'SOLUSDT', name: 'SOL', fullName: 'Solana', pair: 'SOL/USDT', icon: '◎', decimals: 2, basePrice: 186.5, cat: 'HOT' },
+          { rank: 4, symbol: 'BNBUSDT', name: 'BNB', fullName: 'BNB Chain', pair: 'BNB/USDT', icon: '⬡', decimals: 2, basePrice: 610.0, cat: 'L1' },
+          { rank: 5, symbol: 'XRPUSDT', name: 'XRP', fullName: 'Ripple', pair: 'XRP/USDT', icon: '✕', decimals: 4, basePrice: 0.725, cat: 'HOT' },
+          { rank: 6, symbol: 'DOGEUSDT', name: 'DOGE', fullName: 'Dogecoin', pair: 'DOGE/USDT', icon: 'Ð', decimals: 4, basePrice: 0.185, cat: 'MEME' },
+          { rank: 7, symbol: 'ADAUSDT', name: 'ADA', fullName: 'Cardano', pair: 'ADA/USDT', icon: '₳', decimals: 4, basePrice: 0.58, cat: 'L1' },
+          { rank: 8, symbol: 'AVAXUSDT', name: 'AVAX', fullName: 'Avalanche', pair: 'AVAX/USDT', icon: '🔺', decimals: 2, basePrice: 31.5, cat: 'L1' },
+          { rank: 9, symbol: 'SUIUSDT', name: 'SUI', fullName: 'Sui Network', pair: 'SUI/USDT', icon: '💧', decimals: 3, basePrice: 3.25, cat: 'HOT' },
+          { rank: 10, symbol: 'LINKUSDT', name: 'LINK', fullName: 'Chainlink', pair: 'LINK/USDT', icon: '⬡', decimals: 2, basePrice: 14.2, cat: 'DEFI' },
+          { rank: 11, symbol: 'SHIBUSDT', name: 'SHIB', fullName: 'Shiba Inu', pair: 'SHIB/USDT', icon: '🐕', decimals: 7, basePrice: 0.000024, cat: 'MEME' },
+          { rank: 12, symbol: 'PEPEUSDT', name: 'PEPE', fullName: 'Pepe', pair: 'PEPE/USDT', icon: '🐸', decimals: 7, basePrice: 0.0000185, cat: 'MEME' },
+          { rank: 13, symbol: 'NEARUSDT', name: 'NEAR', fullName: 'NEAR Protocol', pair: 'NEAR/USDT', icon: 'Ⓝ', decimals: 3, basePrice: 5.85, cat: 'L1' },
+          { rank: 14, symbol: 'APTUSDT', name: 'APT', fullName: 'Aptos', pair: 'APT/USDT', icon: '▲', decimals: 2, basePrice: 11.2, cat: 'L1' },
+          { rank: 15, symbol: 'DOTUSDT', name: 'DOT', fullName: 'Polkadot', pair: 'DOT/USDT', icon: '●', decimals: 3, basePrice: 5.4, cat: 'L1' },
+          { rank: 16, symbol: 'LTCUSDT', name: 'LTC', fullName: 'Litecoin', pair: 'LTC/USDT', icon: 'Ł', decimals: 2, basePrice: 84.5, cat: 'L1' },
+          { rank: 17, symbol: 'TRXUSDT', name: 'TRX', fullName: 'TRON', pair: 'TRX/USDT', icon: '⟠', decimals: 4, basePrice: 0.195, cat: 'L1' },
+          { rank: 18, symbol: 'BCHUSDT', name: 'BCH', fullName: 'Bitcoin Cash', pair: 'BCH/USDT', icon: 'Ƀ', decimals: 2, basePrice: 440.0, cat: 'L1' },
+          { rank: 19, symbol: 'UNIUSDT', name: 'UNI', fullName: 'Uniswap', pair: 'UNI/USDT', icon: '🦄', decimals: 2, basePrice: 8.95, cat: 'DEFI' },
+          { rank: 20, symbol: 'ICPUSDT', name: 'ICP', fullName: 'Internet Computer', pair: 'ICP/USDT', icon: '∞', decimals: 3, basePrice: 8.7, cat: 'L1' },
+          { rank: 21, symbol: 'FETUSDT', name: 'FET', fullName: 'Artificial Superintelligence', pair: 'FET/USDT', icon: '🤖', decimals: 3, basePrice: 1.35, cat: 'AI' },
+          { rank: 22, symbol: 'RENDERUSDT', name: 'RENDER', fullName: 'Render Network', pair: 'RENDER/USDT', icon: '🎨', decimals: 2, basePrice: 7.45, cat: 'AI' },
+          { rank: 23, symbol: 'TAOUSDT', name: 'TAO', fullName: 'Bittensor', pair: 'TAO/USDT', icon: '🧠', decimals: 2, basePrice: 495.0, cat: 'AI' },
+          { rank: 24, symbol: 'TIAUSDT', name: 'TIA', fullName: 'Celestia', pair: 'TIA/USDT', icon: '✧', decimals: 3, basePrice: 5.1, cat: 'L1' },
+          { rank: 25, symbol: 'KASUSDT', name: 'KAS', fullName: 'Kaspa', pair: 'KAS/USDT', icon: '⚡', decimals: 4, basePrice: 0.135, cat: 'L1' },
+          { rank: 26, symbol: 'SEIUSDT', name: 'SEI', fullName: 'Sei Network', pair: 'SEI/USDT', icon: '🌊', decimals: 4, basePrice: 0.48, cat: 'L1' },
+          { rank: 27, symbol: 'INJUSDT', name: 'INJ', fullName: 'Injective', pair: 'INJ/USDT', icon: '💉', decimals: 2, basePrice: 23.5, cat: 'DEFI' },
+          { rank: 28, symbol: 'FILUSDT', name: 'FIL', fullName: 'Filecoin', pair: 'FIL/USDT', icon: '📁', decimals: 3, basePrice: 4.3, cat: 'L1' },
+          { rank: 29, symbol: 'ARBUSDT', name: 'ARB', fullName: 'Arbitrum', pair: 'ARB/USDT', icon: '🔵', decimals: 4, basePrice: 0.58, cat: 'L1' },
+          { rank: 30, symbol: 'OPUSDT', name: 'OP', fullName: 'Optimism', pair: 'OP/USDT', icon: '🔴', decimals: 3, basePrice: 1.65, cat: 'L1' },
+          { rank: 31, symbol: 'HBARUSDT', name: 'HBAR', fullName: 'Hedera', pair: 'HBAR/USDT', icon: 'Ħ', decimals: 4, basePrice: 0.095, cat: 'L1' },
+          { rank: 32, symbol: 'ATOMUSDT', name: 'ATOM', fullName: 'Cosmos', pair: 'ATOM/USDT', icon: '⚛', decimals: 3, basePrice: 5.25, cat: 'L1' },
+          { rank: 33, symbol: 'XLMUSDT', name: 'XLM', fullName: 'Stellar', pair: 'XLM/USDT', icon: '✦', decimals: 4, basePrice: 0.145, cat: 'L1' },
+          { rank: 34, symbol: 'POLUSDT', name: 'POL', fullName: 'Polygon', pair: 'POL/USDT', icon: '⬡', decimals: 4, basePrice: 0.42, cat: 'L1' },
+          { rank: 35, symbol: 'ALGOUSDT', name: 'ALGO', fullName: 'Algorand', pair: 'ALGO/USDT', icon: 'Ⱥ', decimals: 4, basePrice: 0.18, cat: 'L1' },
+          { rank: 36, symbol: 'STXUSDT', name: 'STX', fullName: 'Stacks', pair: 'STX/USDT', icon: 'Ⓢ', decimals: 3, basePrice: 1.95, cat: 'L1' },
+          { rank: 37, symbol: 'AAVEUSDT', name: 'AAVE', fullName: 'Aave', pair: 'AAVE/USDT', icon: '👻', decimals: 2, basePrice: 162.0, cat: 'DEFI' },
+          { rank: 38, symbol: 'FTMUSDT', name: 'FTM', fullName: 'Fantom', pair: 'FTM/USDT', icon: '👻', decimals: 4, basePrice: 0.74, cat: 'L1' },
+          { rank: 39, symbol: 'BONKUSDT', name: 'BONK', fullName: 'Bonk', pair: 'BONK/USDT', icon: '🔨', decimals: 7, basePrice: 0.000038, cat: 'MEME' },
+          { rank: 40, symbol: 'WIFUSDT', name: 'WIF', fullName: 'dogwifhat', pair: 'WIF/USDT', icon: '🎩', decimals: 3, basePrice: 3.45, cat: 'MEME' },
+          { rank: 41, symbol: 'FLOKIUSDT', name: 'FLOKI', fullName: 'Floki', pair: 'FLOKI/USDT', icon: '⚔️', decimals: 6, basePrice: 0.00021, cat: 'MEME' },
+          { rank: 42, symbol: 'JUPUSDT', name: 'JUP', fullName: 'Jupiter', pair: 'JUP/USDT', icon: '🪐', decimals: 3, basePrice: 1.15, cat: 'DEFI' },
+          { rank: 43, symbol: 'ENAUSDT', name: 'ENA', fullName: 'Ethena', pair: 'ENA/USDT', icon: '💵', decimals: 4, basePrice: 0.54, cat: 'DEFI' },
+          { rank: 44, symbol: 'WLDUSDT', name: 'WLD', fullName: 'Worldcoin', pair: 'WLD/USDT', icon: '🌐', decimals: 3, basePrice: 2.35, cat: 'AI' },
+          { rank: 45, symbol: 'RUNEUSDT', name: 'RUNE', fullName: 'THORChain', pair: 'RUNE/USDT', icon: 'ᚱ', decimals: 3, basePrice: 5.65, cat: 'DEFI' },
+          { rank: 46, symbol: 'GALAUSDT', name: 'GALA', fullName: 'Gala Games', pair: 'GALA/USDT', icon: '🎮', decimals: 5, basePrice: 0.026, cat: 'HOT' },
+          { rank: 47, symbol: 'PYTHUSDT', name: 'PYTH', fullName: 'Pyth Network', pair: 'PYTH/USDT', icon: '🔮', decimals: 4, basePrice: 0.41, cat: 'DEFI' },
+          { rank: 48, symbol: 'PENDLEUSDT', name: 'PENDLE', fullName: 'Pendle', pair: 'PENDLE/USDT', icon: '⏳', decimals: 3, basePrice: 5.2, cat: 'DEFI' },
+          { rank: 49, symbol: 'SANDUSDT', name: 'SAND', fullName: 'The Sandbox', pair: 'SAND/USDT', icon: '🏖️', decimals: 4, basePrice: 0.32, cat: 'HOT' },
+          { rank: 50, symbol: 'MANAUSDT', name: 'MANA', fullName: 'Decentraland', pair: 'MANA/USDT', icon: '🏛️', decimals: 4, basePrice: 0.36, cat: 'HOT' },
+          { rank: 51, symbol: 'AXSUSDT', name: 'AXS', fullName: 'Axie Infinity', pair: 'AXS/USDT', icon: '👾', decimals: 3, basePrice: 5.8, cat: 'HOT' },
+          { rank: 52, symbol: 'CRVUSDT', name: 'CRV', fullName: 'Curve DAO', pair: 'CRV/USDT', icon: '🌈', decimals: 4, basePrice: 0.38, cat: 'DEFI' },
+          { rank: 53, symbol: 'MKRUSDT', name: 'MKR', fullName: 'Maker', pair: 'MKR/USDT', icon: 'Ⓜ️', decimals: 1, basePrice: 1480.0, cat: 'DEFI' },
+          { rank: 54, symbol: 'LDOUSDT', name: 'LDO', fullName: 'Lido DAO', pair: 'LDO/USDT', icon: '💧', decimals: 3, basePrice: 1.25, cat: 'DEFI' },
+          { rank: 55, symbol: 'QNTUSDT', name: 'QNT', fullName: 'Quant', pair: 'QNT/USDT', icon: '🎯', decimals: 2, basePrice: 68.5, cat: 'L1' },
+          { rank: 56, symbol: 'EOSUSDT', name: 'EOS', fullName: 'EOS', pair: 'EOS/USDT', icon: 'Ɛ', decimals: 4, basePrice: 0.55, cat: 'L1' },
+          { rank: 57, symbol: 'FLOWUSDT', name: 'FLOW', fullName: 'Flow', pair: 'FLOW/USDT', icon: '🌊', decimals: 4, basePrice: 0.62, cat: 'L1' },
+          { rank: 58, symbol: 'BLURUSDT', name: 'BLUR', fullName: 'Blur', pair: 'BLUR/USDT', icon: '💨', decimals: 4, basePrice: 0.24, cat: 'HOT' },
+          { rank: 59, symbol: 'ORDIUSDT', name: 'ORDI', fullName: 'Ordinals', pair: 'ORDI/USDT', icon: '🟧', decimals: 2, basePrice: 39.5, cat: 'HOT' },
+          { rank: 60, symbol: '1000SATSUSDT', name: 'SATS', fullName: '1000SATS', pair: '1000SATS/USDT', icon: '⚡', decimals: 6, basePrice: 0.00026, cat: 'HOT' },
+          { rank: 61, symbol: 'DYDXUSDT', name: 'DYDX', fullName: 'dYdX', pair: 'DYDX/USDT', icon: '✕', decimals: 3, basePrice: 1.25, cat: 'DEFI' },
+          { rank: 62, symbol: 'STRKUSDT', name: 'STRK', fullName: 'Starknet', pair: 'STRK/USDT', icon: '✴️', decimals: 4, basePrice: 0.46, cat: 'L1' },
+          { rank: 63, symbol: 'ZKUSDT', name: 'ZK', fullName: 'ZKsync', pair: 'ZK/USDT', icon: '🛡️', decimals: 4, basePrice: 0.145, cat: 'L1' },
+          { rank: 64, symbol: 'IOUSDT', name: 'IO', fullName: 'io.net', pair: 'IO/USDT', icon: '⚡', decimals: 3, basePrice: 2.25, cat: 'AI' },
+          { rank: 65, symbol: 'NOTUSDT', name: 'NOT', fullName: 'Notcoin', pair: 'NOT/USDT', icon: '💎', decimals: 5, basePrice: 0.0076, cat: 'MEME' },
+          { rank: 66, symbol: 'DOGSUSDT', name: 'DOGS', fullName: 'Dogs TMA', pair: 'DOGS/USDT', icon: '🐶', decimals: 6, basePrice: 0.00068, cat: 'MEME' },
+          { rank: 67, symbol: 'CATIUSDT', name: 'CATI', fullName: 'Catizen', pair: 'CATI/USDT', icon: '🐱', decimals: 4, basePrice: 0.38, cat: 'HOT' },
+          { rank: 68, symbol: 'NEIROUSDT', name: 'NEIRO', fullName: 'First Neiro', pair: 'NEIRO/USDT', icon: '🐾', decimals: 5, basePrice: 0.0019, cat: 'MEME' },
+          { rank: 69, symbol: 'EIGENUSDT', name: 'EIGEN', fullName: 'EigenLayer', pair: 'EIGEN/USDT', icon: '🌿', decimals: 3, basePrice: 2.85, cat: 'DEFI' },
+          { rank: 70, symbol: 'GRTUSDT', name: 'GRT', fullName: 'The Graph', pair: 'GRT/USDT', icon: '📊', decimals: 4, basePrice: 0.21, cat: 'AI' },
+          { rank: 71, symbol: 'THETAUSDT', name: 'THETA', fullName: 'Theta Network', pair: 'THETA/USDT', icon: 'ϑ', decimals: 3, basePrice: 1.45, cat: 'L1' },
+          { rank: 72, symbol: 'CHZUSDT', name: 'CHZ', fullName: 'Chiliz', pair: 'CHZ/USDT', icon: '⚽', decimals: 4, basePrice: 0.072, cat: 'HOT' },
+          { rank: 73, symbol: 'SNXUSDT', name: 'SNX', fullName: 'Synthetix', pair: 'SNX/USDT', icon: '⚔️', decimals: 3, basePrice: 1.62, cat: 'DEFI' },
+          { rank: 74, symbol: 'MINAUSDT', name: 'MINA', fullName: 'Mina Protocol', pair: 'MINA/USDT', icon: 'Ⓜ️', decimals: 4, basePrice: 0.62, cat: 'L1' },
+          { rank: 75, symbol: 'CFXUSDT', name: 'CFX', fullName: 'Conflux', pair: 'CFX/USDT', icon: '🇨🇳', decimals: 4, basePrice: 0.165, cat: 'L1' },
+          { rank: 76, symbol: 'RONINUSD', name: 'RONIN', fullName: 'Ronin Network', pair: 'RONIN/USDT', icon: '⚔️', decimals: 3, basePrice: 1.75, cat: 'HOT' },
+          { rank: 77, symbol: 'AXLUSDT', name: 'AXL', fullName: 'Axelar', pair: 'AXL/USDT', icon: '🔀', decimals: 4, basePrice: 0.68, cat: 'L1' },
+          { rank: 78, symbol: 'ZROUSDT', name: 'ZRO', fullName: 'LayerZero', pair: 'ZRO/USDT', icon: '⭕', decimals: 3, basePrice: 3.85, cat: 'L1' },
+          { rank: 79, symbol: 'WUSDT', name: 'W', fullName: 'Wormhole', pair: 'W/USDT', icon: '🌀', decimals: 4, basePrice: 0.28, cat: 'L1' },
+          { rank: 80, symbol: 'BOMEUSDT', name: 'BOME', fullName: 'Book of Meme', pair: 'BOME/USDT', icon: '📖', decimals: 5, basePrice: 0.0098, cat: 'MEME' },
+          { rank: 81, symbol: 'MEMEUSDT', name: 'MEME', fullName: 'Memecoin', pair: 'MEME/USDT', icon: '🎭', decimals: 5, basePrice: 0.0135, cat: 'MEME' },
+          { rank: 82, symbol: 'TURBOUSDT', name: 'TURBO', fullName: 'Turbo Toad', pair: 'TURBO/USDT', icon: '🐸', decimals: 5, basePrice: 0.0084, cat: 'MEME' },
+          { rank: 83, symbol: 'POPCATUSDT', name: 'POPCAT', fullName: 'Popcat', pair: 'POPCAT/USDT', icon: '🐱', decimals: 3, basePrice: 1.55, cat: 'MEME' },
+          { rank: 84, symbol: 'MEWUSDT', name: 'MEW', fullName: 'cat in dogs world', pair: 'MEW/USDT', icon: '🐱', decimals: 5, basePrice: 0.0092, cat: 'MEME' },
+          { rank: 85, symbol: 'CKBUSDT', name: 'CKB', fullName: 'Nervos Network', pair: 'CKB/USDT', icon: '🧬', decimals: 5, basePrice: 0.0145, cat: 'L1' },
+          { rank: 86, symbol: 'KAVAUSDT', name: 'KAVA', fullName: 'Kava', pair: 'KAVA/USDT', icon: '₭', decimals: 4, basePrice: 0.38, cat: 'L1' },
+          { rank: 87, symbol: 'BEAMXUSDT', name: 'BEAMX', fullName: 'Beam', pair: 'BEAMX/USDT', icon: '🎮', decimals: 5, basePrice: 0.021, cat: 'HOT' },
+          { rank: 88, symbol: 'GMXUSDT', name: 'GMX', fullName: 'GMX', pair: 'GMX/USDT', icon: '🫐', decimals: 2, basePrice: 28.5, cat: 'DEFI' },
+          { rank: 89, symbol: 'DYMUSDT', name: 'DYM', fullName: 'Dymension', pair: 'DYM/USDT', icon: '📦', decimals: 3, basePrice: 1.72, cat: 'L1' },
+          { rank: 90, symbol: 'MANTAUSDT', name: 'MANTA', fullName: 'Manta Network', pair: 'MANTA/USDT', icon: '🐋', decimals: 4, basePrice: 0.88, cat: 'L1' },
+          { rank: 91, symbol: 'ALTUSDT', name: 'ALT', fullName: 'Altlayer', pair: 'ALT/USDT', icon: '🅰️', decimals: 4, basePrice: 0.115, cat: 'L1' },
+          { rank: 92, symbol: 'PIXELUSDT', name: 'PIXEL', fullName: 'Pixels', pair: 'PIXEL/USDT', icon: '👾', decimals: 4, basePrice: 0.185, cat: 'HOT' },
+          { rank: 93, symbol: 'PORTALUSDT', name: 'PORTAL', fullName: 'Portal', pair: 'PORTAL/USDT', icon: '🌀', decimals: 4, basePrice: 0.32, cat: 'HOT' },
+          { rank: 94, symbol: 'AEVOUSDT', name: 'AEVO', fullName: 'Aevo', pair: 'AEVO/USDT', icon: '📈', decimals: 4, basePrice: 0.39, cat: 'DEFI' },
+          { rank: 95, symbol: 'ETHFIUSDT', name: 'ETHFI', fullName: 'Ether.fi', pair: 'ETHFI/USDT', icon: '🪙', decimals: 3, basePrice: 1.75, cat: 'DEFI' },
+          { rank: 96, symbol: 'BBUSDT', name: 'BB', fullName: 'BounceBit', pair: 'BB/USDT', icon: '🟡', decimals: 4, basePrice: 0.31, cat: 'L1' },
+          { rank: 97, symbol: 'OMNIUSDT', name: 'OMNI', fullName: 'Omni Network', pair: 'OMNI/USDT', icon: '🌐', decimals: 3, basePrice: 8.45, cat: 'L1' },
+          { rank: 98, symbol: 'REZUSDT', name: 'REZ', fullName: 'Renzo', pair: 'REZ/USDT', icon: '💎', decimals: 5, basePrice: 0.042, cat: 'DEFI' },
+          { rank: 99, symbol: 'IOSTUSDT', name: 'IOST', fullName: 'IOST', pair: 'IOST/USDT', icon: '⚡', decimals: 5, basePrice: 0.0062, cat: 'L1' },
+          { rank: 100, symbol: '1INCHUSDT', name: '1INCH', fullName: '1inch Network', pair: '1INCH/USDT', icon: '🦄', decimals: 4, basePrice: 0.34, cat: 'DEFI' }
+        ];
+
+        let currentAssetIndex = 0;
+
+        // ==========================================
+        // 5-MARKET ROTATION (switches every 10-minute round)
+        // ==========================================
+        const ROTATION_SIZE = 5;
+        let rotationPool = [];      // indices of the 5 markets currently offered
+        let rotationQueue = [];     // shuffled queue so every coin eventually shows up
+
+        function shuffleIndices(n) {
+          const arr = Array.from({ length: n }, (_, i) => i);
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+          return arr;
+        }
+
+        function rotateMarketPool() {
+          if (rotationQueue.length < ROTATION_SIZE) {
+            rotationQueue = shuffleIndices(ASSETS.length);
+          }
+          rotationPool = rotationQueue.splice(0, ROTATION_SIZE);
+          currentAssetIndex = rotationPool[0];
+          prefetchPoolPrices();
+          return rotationPool;
+        }
+
+        function prefetchPoolPrices() {
+          rotationPool.forEach(async (idx) => {
+            const asset = ASSETS[idx];
+            try {
+              const price = await PriceService.fetchPrice(asset.symbol);
+              const el = document.querySelector(`.tab-price-${asset.symbol}`);
+              if (el) {
+                el.textContent = `$${price.toLocaleString(undefined, { maximumFractionDigits: Math.min(2, asset.decimals) })}`;
+              }
+            } catch (e) {}
+          });
+        }
+
+        function isInRotation(idx) {
+          return rotationPool.indexOf(idx) !== -1;
+        }
+
+        const PriceService = {
+          cache: {},
+
+          async fetchPrice(symbol) {
+            try {
+              // Direct free REST endpoint - strictly low-frequency polled
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3500);
+              const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, {
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+              if (res.ok) {
+                const data = await res.json();
+                const price = parseFloat(data.price);
+                if (!isNaN(price) && price > 0) {
+                  this.cache[symbol] = price;
+                  return price;
+                }
+              }
+            } catch (err) {
+              console.warn(`Binance REST query failed for ${symbol}, using graceful baseline:`, err);
+            }
+
+            // Fallback: If network offline, CORS blocked or Binance rate-limited
+            const asset = ASSETS.find(a => a.symbol === symbol) || ASSETS[0];
+            const currentCached = this.cache[symbol] || asset.basePrice;
+            // Realistic tiny micro-drift
+            const drift = currentCached * (1 + (Math.random() - 0.495) * 0.002);
+            this.cache[symbol] = drift;
+            return drift;
+          }
+        };
+
+        // ==========================================
+        // 4. USER CHIP WALLET & STATS ENGINE
+        // ==========================================
+        const DAILY_REWARD_CHIPS = 1000;
+        const AD_REWARD_CHIPS = 1000;
+        const MAX_DAILY_ADS = 3;
+
+        // Invite referral rewards (Mini App invite link)
+        const INVITE_REWARD_CHIPS = 1000;
+        const MAX_INVITE_REWARDS = 3;
+
+        // Milestone missions: progress is read from Wallet.stats
+        const MISSIONS = [
+          { id: 'streak_10', type: 'streak', target: 10, reward: 5000, title: 'Streak x10', desc: 'Reach a 10-round win streak', icon: '🔥' },
+          { id: 'streak_25', type: 'streak', target: 25, reward: 10000, title: 'Streak x25', desc: 'Reach a 25-round win streak', icon: '🔥' },
+          { id: 'wins_30', type: 'wins', target: 30, reward: 5000, title: 'Win 30 Rounds', desc: 'Win 30 prediction rounds', icon: '✅' },
+          { id: 'wins_50', type: 'wins', target: 50, reward: 10000, title: 'Win 50 Rounds', desc: 'Win 50 prediction rounds', icon: '🏅' },
+          { id: 'losses_100', type: 'losses', target: 100, reward: 10000, title: 'Lose 100 Rounds', desc: 'Play through 100 losing rounds', icon: '💀' },
+        ];
+
+        const Wallet = {
+          chips: 5000,
+          stats: {
+            roundsPlayed: 0,
+            wins: 0,
+            losses: 0,
+            streak: 0,
+            bestStreak: 0,
+            netPnL: 0,
+          },
+          rewards: {
+            date: '',
+            dailyClaimed: false,
+            adWatches: 0,
+          },
+          claimedMissions: [],
+
+          load() {
+            try {
+              const savedChips = localStorage.getItem('cf_tma_chips');
+              if (savedChips !== null) {
+                this.chips = Math.max(0, parseInt(savedChips, 10));
+              }
+              const savedStats = localStorage.getItem('cf_tma_stats');
+              if (savedStats) {
+                this.stats = Object.assign(this.stats, JSON.parse(savedStats));
+              }
+            } catch (e) {}
+            this.loadRewards();
+            this.loadMissions();
+            this.syncUI();
+          },
+
+          save() {
+            try {
+              localStorage.setItem('cf_tma_chips', this.chips.toString());
+              localStorage.setItem('cf_tma_stats', JSON.stringify(this.stats));
+            } catch (e) {}
+            this.syncUI();
+          },
+
+          // ---------- Daily rewards / ad limits ----------
+          todayKey() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+          },
+
+          loadRewards() {
+            try {
+              const raw = localStorage.getItem('cf_tma_rewards');
+              if (raw) {
+                const saved = JSON.parse(raw);
+                if (saved && saved.date === this.todayKey()) {
+                  this.rewards.dailyClaimed = Boolean(saved.dailyClaimed);
+                  const watches = parseInt(saved.adWatches, 10);
+                  this.rewards.adWatches = Number.isNaN(watches) ? 0 : Math.min(Math.max(watches, 0), MAX_DAILY_ADS);
+                  const invites = parseInt(saved.invitesClaimed, 10);
+                  this.rewards.invitesClaimed = Number.isNaN(invites) ? 0 : Math.min(Math.max(invites, 0), MAX_INVITE_REWARDS);
+                }
+              }
+            } catch (e) {}
+            this.rewards.date = this.todayKey();
+            this.saveRewards();
+          },
+
+          // Resets counters when the calendar day changes (app can stay open past midnight)
+          ensureRewardDay() {
+            if (this.rewards.date !== this.todayKey()) {
+              // Invite count is a lifetime cap (3), not a daily cap, so preserve it across days.
+              const invitesClaimed = this.rewards.invitesClaimed || 0;
+              this.rewards = { date: this.todayKey(), dailyClaimed: false, adWatches: 0, invitesClaimed };
+              this.saveRewards();
+            }
+          },
+
+          saveRewards() {
+            try {
+              localStorage.setItem('cf_tma_rewards', JSON.stringify(this.rewards));
+            } catch (e) {}
+            this.syncRewardsUI();
+          },
+
+          adsRemaining() {
+            return Math.max(0, MAX_DAILY_ADS - this.rewards.adWatches);
+          },
+
+          recordAdWatch() {
+            this.ensureRewardDay();
+            this.rewards.adWatches = Math.min(this.rewards.adWatches + 1, MAX_DAILY_ADS);
+            this.saveRewards();
+          },
+
+          claimDailyReward() {
+            this.ensureRewardDay();
+            if (this.rewards.dailyClaimed) return false;
+            this.rewards.dailyClaimed = true;
+            this.addChips(DAILY_REWARD_CHIPS);
+            this.saveRewards();
+            return true;
+          },
+
+          // Invite referral rewards: up to MAX_INVITE_REWARDS invites, each worth INVITE_REWARD_CHIPS.
+          // The link is not live yet, so claiming is prepared now and will pay out once a backend
+          // or Telegram deep-link can verify a real invite signup. Until then the claim flow is
+          // ready but depends on the invite link being set.
+          claimInviteReward() {
+            this.ensureRewardDay();
+            if (!this.isInviteReady()) return false;
+            if (this.rewards.invitesClaimed >= MAX_INVITE_REWARDS) return false;
+            this.rewards.invitesClaimed += 1;
+            this.addChips(INVITE_REWARD_CHIPS);
+            this.saveRewards();
+            return true;
+          },
+
+          isInviteReady() {
+            return InviteModal && InviteModal.isReady && InviteModal.isReady();
+          },
+
+          invitesRemaining() {
+            return Math.max(0, MAX_INVITE_REWARDS - (this.rewards.invitesClaimed || 0));
+          },
+
+          syncRewardsUI() {
+            const remaining = this.adsRemaining();
+
+            const adBtn = document.getElementById('watch-ad-btn');
+            const adLabel = document.getElementById('watch-ad-label');
+            if (adBtn && adLabel) {
+              if (remaining <= 0) {
+                adBtn.disabled = true;
+                adLabel.textContent = 'Daily Ad Limit Reached';
+              } else {
+                adBtn.disabled = false;
+                adLabel.textContent = `Watch Sponsor Ad (+${AD_REWARD_CHIPS.toLocaleString()})`;
+              }
+            }
+
+            const remainingEl = document.getElementById('ad-remaining-label');
+            if (remainingEl) {
+              remainingEl.textContent = `${remaining} / ${MAX_DAILY_ADS} left`;
+              remainingEl.className = remaining > 0
+                ? 'text-emerald-400 font-semibold'
+                : 'text-[#f6465d] font-semibold';
+            }
+
+            const claimBtn = document.getElementById('claim-daily-btn');
+            const claimLabel = document.getElementById('claim-daily-label');
+            if (claimBtn && claimLabel) {
+              if (this.rewards.dailyClaimed) {
+                claimBtn.disabled = true;
+                claimLabel.textContent = 'Daily Reward Claimed ✓';
+              } else {
+                claimBtn.disabled = false;
+                claimLabel.textContent = `Claim Daily Reward (+${DAILY_REWARD_CHIPS.toLocaleString()})`;
+              }
+            }
+
+            const resetEl = document.getElementById('daily-reset-label');
+            if (resetEl) {
+              resetEl.textContent = this.rewards.dailyClaimed
+                ? 'Come back tomorrow for the next reward'
+                : 'Available once every day';
+            }
+
+            // Invite reward progress UI (shown inside the invite modal)
+            const inviteStatusEl = document.getElementById('invite-reward-status');
+            const inviteClaimBtn = document.getElementById('claim-invite-reward-btn');
+            if (inviteStatusEl) {
+              const claimed = this.rewards.invitesClaimed || 0;
+              const remaining = this.invitesRemaining();
+              inviteStatusEl.textContent = `${claimed} / ${MAX_INVITE_REWARDS} claimed`;
+            }
+            if (inviteClaimBtn) {
+              const remaining = this.invitesRemaining();
+              if (remaining <= 0) {
+                inviteClaimBtn.disabled = true;
+                inviteClaimBtn.textContent = 'All claimed ✓';
+              } else if (!this.isInviteReady()) {
+                inviteClaimBtn.disabled = true;
+                inviteClaimBtn.textContent = 'Invite link needed';
+              } else {
+                inviteClaimBtn.disabled = false;
+                inviteClaimBtn.textContent = `Claim +${INVITE_REWARD_CHIPS.toLocaleString()}`;
+              }
+            }
+          },
+
+          // ---------- Missions ----------
+          loadMissions() {
+            try {
+              const raw = localStorage.getItem('cf_tma_missions');
+              if (raw) {
+                const saved = JSON.parse(raw);
+                if (Array.isArray(saved)) {
+                  this.claimedMissions = saved.filter((id) => MISSIONS.some((m) => m.id === id));
+                }
+              }
+            } catch (e) {}
+            this.saveMissions();
+          },
+
+          saveMissions() {
+            try {
+              localStorage.setItem('cf_tma_missions', JSON.stringify(this.claimedMissions));
+            } catch (e) {}
+            this.renderMissions();
+          },
+
+          isMissionClaimed(id) {
+            return this.claimedMissions.indexOf(id) !== -1;
+          },
+
+          missionProgress(mission) {
+            const s = this.stats;
+            if (mission.type === 'streak') return s.bestStreak || 0;
+            if (mission.type === 'wins') return s.wins || 0;
+            if (mission.type === 'losses') return s.losses || 0;
+            return 0;
+          },
+
+          claimMission(id) {
+            const mission = MISSIONS.find((m) => m.id === id);
+            if (!mission) return false;
+            if (this.isMissionClaimed(id)) return false;
+            if (this.missionProgress(mission) < mission.target) return false;
+
+            this.claimedMissions.push(id);
+            this.addChips(mission.reward);
+            this.saveMissions(); // addChips -> save() -> syncUI() -> renderMissions()
+            return true;
+          },
+
+          renderMissions() {
+            const list = document.getElementById('missions-list');
+            if (!list) return;
+
+            list.innerHTML = MISSIONS.map((mission) => {
+              const progress = this.missionProgress(mission);
+              const target = mission.target;
+              const pct = Math.min(100, Math.round((progress / target) * 100));
+              const complete = progress >= target;
+              const claimed = this.isMissionClaimed(mission.id);
+
+              let btnClass = 'mission-claim-btn btn-press shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ';
+              let btnLabel = 'Claim';
+              let badgeClass = 'bg-[#182232] border-[#223044] text-slate-500';
+
+              if (claimed) {
+                btnClass += 'bg-[#1a2230] text-slate-500 border border-[#243044] pointer-events-none';
+                btnLabel = 'Claimed ✓';
+                badgeClass = 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400';
+              } else if (complete) {
+                btnClass += 'bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md shadow-amber-500/20';
+                btnLabel = 'Claim';
+                badgeClass = 'bg-amber-500/10 border-amber-500/30 text-amber-300';
+              } else {
+                btnClass += 'bg-[#1a2230] text-slate-500 border border-[#243044] pointer-events-none';
+                btnLabel = 'Locked';
+                badgeClass = 'bg-[#182232] border-[#223044] text-slate-500';
+              }
+
+              const barColor = claimed
+                ? 'bg-emerald-500'
+                : complete
+                  ? 'bg-gradient-to-r from-amber-400 to-amber-500'
+                  : 'bg-[#3894e6]';
+
+              return `
+                <div class="mission-item rounded-xl border ${badgeClass} bg-[#0f1420] p-2.5 flex items-center gap-2.5">
+                  <div class="w-9 h-9 shrink-0 rounded-lg ${badgeClass} border flex items-center justify-center text-base">${mission.icon}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="font-sans font-bold text-white text-xs truncate">${mission.title}</span>
+                      <span class="font-mono font-bold text-[11px] text-[#f3ba2f] shrink-0">+${mission.reward.toLocaleString()}</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-mono mt-0.5 truncate">${mission.desc}</div>
+                    <div class="flex items-center gap-2 mt-1.5">
+                      <div class="flex-1 h-1.5 rounded-full bg-[#161d2b] overflow-hidden">
+                        <div class="h-full ${barColor} transition-all duration-300" style="width: ${pct}%;"></div>
+                      </div>
+                      <span class="text-[10px] font-mono text-slate-400 tabular-nums shrink-0">${Math.min(progress, target)}/${target}</span>
+                    </div>
+                  </div>
+                  <button data-mission="${mission.id}" class="${btnClass}">${btnLabel}</button>
+                </div>
+              `;
+            }).join('');
+          },
+
+          addChips(amount) {
+            this.chips += amount;
+            this.save();
+          },
+
+          deductChips(amount) {
+            if (this.chips >= amount) {
+              this.chips -= amount;
+              this.save();
+              return true;
+            }
+            return false;
+          },
+
+          recordResult(isWin, betAmount, payout) {
+            this.stats.roundsPlayed++;
+            if (isWin) {
+              this.stats.wins++;
+              this.stats.streak++;
+              if (this.stats.streak > this.stats.bestStreak) {
+                this.stats.bestStreak = this.stats.streak;
+              }
+              this.stats.netPnL += (payout - betAmount);
+            } else {
+              this.stats.losses++;
+              this.stats.streak = 0;
+              this.stats.netPnL -= betAmount;
+            }
+            this.save();
+          },
+
+          resetStats() {
+            this.stats = {
+              roundsPlayed: 0,
+              wins: 0,
+              losses: 0,
+              streak: 0,
+              bestStreak: 0,
+              netPnL: 0,
+            };
+            this.save();
+          },
+
+          syncUI() {
+            const inPlay = (typeof RoundState !== 'undefined' && RoundState.userBet) ? RoundState.userBet.amount : 0;
+            const available = this.chips;
+            // Bets are deducted from the wallet the moment a position is entered,
+            // so the headline balance reflects the spendable chips only.
+            const total = available;
+
+            const displayEl = document.getElementById('user-chips-display');
+            if (displayEl) displayEl.textContent = total.toLocaleString();
+
+            const heroTotalEl = document.getElementById('hero-total-balance');
+            if (heroTotalEl) heroTotalEl.textContent = total.toLocaleString();
+
+            const inPlayEl = document.getElementById('balance-positions');
+            const stakeEl = document.getElementById('position-stake');
+            const activeBet = (typeof RoundState !== 'undefined') ? RoundState.userBet : null;
+            if (inPlayEl) {
+              if (activeBet) {
+                const assetName = activeBet.assetName
+                  || (typeof ASSETS !== 'undefined' && ASSETS[currentAssetIndex] ? ASSETS[currentAssetIndex].name : 'Asset');
+                const isUp = activeBet.direction === 'UP';
+                inPlayEl.textContent = `${assetName}: ${isUp ? 'Up' : 'Down'}`;
+                inPlayEl.className = `font-bold tabular-nums truncate ${isUp ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+              } else {
+                inPlayEl.textContent = 'None';
+                inPlayEl.className = 'text-slate-500 font-bold truncate';
+              }
+            }
+            if (stakeEl) {
+              stakeEl.textContent = activeBet ? `${activeBet.amount.toLocaleString()} chips` : '';
+            }
+
+            const betAreaBal = document.getElementById('bet-area-balance');
+            if (betAreaBal) betAreaBal.textContent = available.toLocaleString();
+
+            const statusTag = document.getElementById('balance-status-tag');
+            if (statusTag) {
+              if (inPlay > 0) {
+                statusTag.textContent = 'In Round';
+                statusTag.className = 'text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 font-semibold';
+              } else if (available === 0) {
+                statusTag.textContent = 'Empty';
+                statusTag.className = 'text-[10px] px-1.5 py-0.2 rounded bg-red-500/15 text-[#f6465d] font-semibold';
+              } else {
+                statusTag.textContent = 'Active';
+                statusTag.className = 'text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-semibold';
+              }
+            }
+
+            const rankChipsEl = document.getElementById('ranks-user-chips');
+            if (rankChipsEl) rankChipsEl.textContent = `${total.toLocaleString()} 🪙`;
+
+            const roundsEl = document.getElementById('stat-rounds-count');
+            if (roundsEl) roundsEl.textContent = `${this.stats.roundsPlayed} Rounds Played`;
+
+            const winRateEl = document.getElementById('stat-win-rate');
+            if (winRateEl) {
+              const rate = this.stats.roundsPlayed > 0 
+                ? ((this.stats.wins / this.stats.roundsPlayed) * 100).toFixed(1)
+                : '0.0';
+              winRateEl.textContent = `${rate}%`;
+            }
+
+            const winLossEl = document.getElementById('stat-win-loss');
+            if (winLossEl) {
+              winLossEl.textContent = `${this.stats.wins}W - ${this.stats.losses}L`;
+            }
+
+            const streakEl = document.getElementById('stat-streak');
+            if (streakEl) {
+              streakEl.textContent = `${this.stats.streak} 🔥`;
+            }
+
+            const pnlEl = document.getElementById('stat-pnl');
+            if (pnlEl) {
+              const sign = this.stats.netPnL > 0 ? '+' : '';
+              pnlEl.textContent = `${sign}${this.stats.netPnL.toLocaleString()}`;
+              pnlEl.className = `text-xs font-bold mt-0.5 tabular-nums ${this.stats.netPnL >= 0 ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+            }
+
+            if (document.getElementById('missions-list')) this.renderMissions();
+          }
+        };
+
+        // ==========================================
+        // 5. 10-MINUTE PANCAKESWAP-STYLE ROUND ENGINE
+        // ==========================================
+        // 10-Minute Real Rounds: 600s total (120s betting, 480s locked tracking)
+        const GAME_MODES = {
+          REAL: { name: 'Standard 10m', totalSeconds: 600, bettingSeconds: 120, tickInterval: 1000 }
+        };
+
+        const currentMode = 'REAL'; // Always real 10m mode
+
+        // Round State Model
+        const RoundState = {
+          roundId: 1042,
+          phase: 'BETTING', // 'BETTING' (2m) | 'LOCKED' (8m) | 'SETTLED'
+          secondsElapsed: 0,
+          currentPrice: 88500,
+          lockPrice: null,
+          prevClosePrice: null,   // last settled price — becomes the next round's lock
+          prevCloseSymbol: null,
+          closePrice: null,
+          userBet: null, // { direction: 'UP' | 'DOWN', amount: 500, timestamp: Date.now() }
+          pool: {
+            up: 14200,
+            down: 11800,
+            upMultiplier: 1.85,
+            downMultiplier: 2.15
+          },
+          priceHistory: [], // Points for 2D Canvas chart
+          roundTimer: null,
+          historyList: [
+            {
+              roundId: 1041,
+              symbol: 'BTC',
+              pair: 'BTC/USDT',
+              lockPrice: 88240.50,
+              closePrice: 88510.20,
+              winner: 'UP',
+              multiplier: 1.85,
+              userBet: { direction: 'UP', amount: 500 },
+              userWon: true,
+              payout: 925,
+              timestamp: '10m ago'
+            },
+            {
+              roundId: 1040,
+              symbol: 'ETH',
+              pair: 'ETH/USDT',
+              lockPrice: 2695.80,
+              closePrice: 2682.40,
+              winner: 'DOWN',
+              multiplier: 2.15,
+              userBet: null,
+              userWon: false,
+              payout: 0,
+              timestamp: '20m ago'
+            },
+            {
+              roundId: 1039,
+              symbol: 'SOL',
+              pair: 'SOL/USDT',
+              lockPrice: 184.20,
+              closePrice: 186.75,
+              winner: 'UP',
+              multiplier: 1.76,
+              userBet: { direction: 'UP', amount: 250 },
+              userWon: true,
+              payout: 440,
+              timestamp: '30m ago'
+            },
+            {
+              roundId: 1038,
+              symbol: 'BTC',
+              pair: 'BTC/USDT',
+              lockPrice: 88490.00,
+              closePrice: 88180.00,
+              winner: 'DOWN',
+              multiplier: 1.95,
+              userBet: null,
+              userWon: false,
+              payout: 0,
+              timestamp: '40m ago'
+            },
+            {
+              roundId: 1037,
+              symbol: 'DOGE',
+              pair: 'DOGE/USDT',
+              lockPrice: 0.1820,
+              closePrice: 0.1865,
+              winner: 'UP',
+              multiplier: 2.40,
+              userBet: null,
+              userWon: false,
+              payout: 0,
+              timestamp: '50m ago'
+            }
+          ]
+        };
+
+        // ==========================================
+        // 6. HIGH-PERFORMANCE 2D CANVAS CHART
+        // ==========================================
+        const CanvasChart = {
+          canvas: null,
+          ctx: null,
+          width: 0,
+          height: 0,
+          animationFrameId: null,
+
+          init() {
+            this.canvas = document.getElementById('predictionCanvas');
+            if (!this.canvas) return;
+            this.ctx = this.canvas.getContext('2d');
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+            this.startLoop();
+          },
+
+          resize() {
+            if (!this.canvas) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            this.width = rect.width;
+            this.height = rect.height;
+            this.canvas.width = rect.width * dpr;
+            this.canvas.height = rect.height * dpr;
+            this.ctx.resetTransform?.();
+            this.ctx.scale(dpr, dpr);
+          },
+
+          startLoop() {
+            const render = () => {
+              this.draw();
+              this.animationFrameId = requestAnimationFrame(render);
+            };
+            this.animationFrameId = requestAnimationFrame(render);
+          },
+
+          draw() {
+            if (!this.ctx || this.width === 0 || this.height === 0) return;
+            const ctx = this.ctx;
+            const w = this.width;
+            const h = this.height;
+
+            // Clear Canvas
+            ctx.clearRect(0, 0, w, h);
+
+            // Subtle Background Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            const gridSpacingX = w / 6;
+            for (let x = gridSpacingX; x < w; x += gridSpacingX) {
+              ctx.beginPath();
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, h);
+              ctx.stroke();
+            }
+            const gridSpacingY = h / 4;
+            for (let y = gridSpacingY; y < h; y += gridSpacingY) {
+              ctx.beginPath();
+              ctx.moveTo(0, y);
+              ctx.lineTo(w, y);
+              ctx.stroke();
+            }
+
+            const history = RoundState.priceHistory;
+            if (history.length < 2) return;
+
+            // Compute price min and max with buffer
+            let minP = Infinity;
+            let maxP = -Infinity;
+            history.forEach(p => {
+              if (p.price < minP) minP = p.price;
+              if (p.price > maxP) maxP = p.price;
+            });
+
+            const lockPrice = RoundState.lockPrice;
+            if (lockPrice !== null) {
+              minP = Math.min(minP, lockPrice);
+              maxP = Math.max(maxP, lockPrice);
+            }
+
+            const range = Math.max((maxP - minP), minP * 0.001);
+            const padding = range * 0.25;
+            const chartMin = minP - padding;
+            const chartMax = maxP + padding;
+
+            const getY = (price) => {
+              const ratio = (price - chartMin) / (chartMax - chartMin);
+              return h - ratio * h;
+            };
+
+            const getX = (idx) => {
+              const totalSlots = Math.max(history.length, 30);
+              return (idx / (totalSlots - 1)) * w;
+            };
+
+            // Draw Lock Price Baseline (if locked or tracking)
+            if (lockPrice !== null) {
+              const lockY = getY(lockPrice);
+
+              // Background tint zones (Green above lock price, Red below)
+              const greenGrad = ctx.createLinearGradient(0, 0, 0, lockY);
+              greenGrad.addColorStop(0, 'rgba(14, 203, 129, 0.08)');
+              greenGrad.addColorStop(1, 'rgba(14, 203, 129, 0.01)');
+              ctx.fillStyle = greenGrad;
+              ctx.fillRect(0, 0, w, Math.max(0, lockY));
+
+              const redGrad = ctx.createLinearGradient(0, lockY, 0, h);
+              redGrad.addColorStop(0, 'rgba(246, 70, 93, 0.01)');
+              redGrad.addColorStop(1, 'rgba(246, 70, 93, 0.08)');
+              ctx.fillStyle = redGrad;
+              ctx.fillRect(0, lockY, w, h - lockY);
+
+              // Dashed Lock Line
+              ctx.save();
+              ctx.strokeStyle = '#f3ba2f';
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
+              ctx.moveTo(0, lockY);
+              ctx.lineTo(w, lockY);
+              ctx.stroke();
+              ctx.restore();
+
+              // Lock Price Tag on side
+              ctx.fillStyle = '#f3ba2f';
+              ctx.font = '600 9px "JetBrains Mono"';
+              ctx.textAlign = 'right';
+              ctx.fillText(`LOCK: ${lockPrice.toFixed(ASSETS[currentAssetIndex].decimals)}`, w - 8, lockY - 4);
+            }
+
+            // Draw Price Trajectory Line
+            const isBullish = lockPrice !== null 
+              ? RoundState.currentPrice >= lockPrice 
+              : history[history.length - 1].price >= history[0].price;
+            
+            const strokeColor = isBullish ? '#0ecb81' : '#f6465d';
+
+            // Area Gradient Under Line
+            const areaGrad = ctx.createLinearGradient(0, 0, 0, h);
+            if (isBullish) {
+              areaGrad.addColorStop(0, 'rgba(14, 203, 129, 0.28)');
+              areaGrad.addColorStop(1, 'rgba(14, 203, 129, 0.0)');
+            } else {
+              areaGrad.addColorStop(0, 'rgba(246, 70, 93, 0.28)');
+              areaGrad.addColorStop(1, 'rgba(246, 70, 93, 0.0)');
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(getX(0), getY(history[0].price));
+            for (let i = 1; i < history.length; i++) {
+              const prevX = getX(i - 1);
+              const prevY = getY(history[i - 1].price);
+              const currX = getX(i);
+              const currY = getY(history[i].price);
+              const midX = (prevX + currX) / 2;
+              ctx.quadraticCurveTo(prevX, prevY, midX, (prevY + currY) / 2);
+            }
+            const lastIdx = history.length - 1;
+            const lastX = getX(lastIdx);
+            const lastY = getY(history[lastIdx].price);
+            ctx.lineTo(lastX, lastY);
+
+            // Fill Area
+            ctx.save();
+            ctx.lineTo(lastX, h);
+            ctx.lineTo(getX(0), h);
+            ctx.closePath();
+            ctx.fillStyle = areaGrad;
+            ctx.fill();
+            ctx.restore();
+
+            // Stroke Curve
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Pulsing Live Price Dot
+            const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
+            const pulseRadius = 5 + pulse * 4;
+
+            // Outer Glow
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, pulseRadius + 3, 0, Math.PI * 2);
+            ctx.fillStyle = isBullish ? 'rgba(14, 203, 129, 0.25)' : 'rgba(246, 70, 93, 0.25)';
+            ctx.fill();
+
+            // Inner Solid Dot
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+          }
+        };
+
+        // ==========================================
+        // 7. PREDICTION GAME CONTROLLER
+        // ==========================================
+        let selectedChipAmount = 500;
+
+        const GameEngine = {
+          async init() {
+            // Pick the first set of 5 active markets
+            rotateMarketPool();
+
+            // Render Crypto Asset Tabs
+            this.renderCryptoTabs();
+
+            // Initial Price Fetch
+            await this.updateCurrentPrice();
+
+            // Seed initial chart points
+            this.seedHistory();
+
+            // Load saved settled round history if available
+            try {
+              const savedHist = localStorage.getItem('cf_tma_history');
+              if (savedHist) {
+                const parsed = JSON.parse(savedHist);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  RoundState.historyList = parsed;
+                }
+              }
+            } catch (e) {}
+
+            // Render Round History List immediately
+            this.renderHistoryList();
+
+            // Start Game Loop
+            this.startRoundLoop();
+
+            // Bind Event Listeners
+            this.bindEvents();
+          },
+
+          renderCryptoTabs() {
+            const container = document.getElementById('crypto-tabs-strip') || document.getElementById('crypto-tab-bar');
+            if (!container) return;
+
+            const pool = rotationPool.length ? rotationPool : ASSETS.map((_, i) => i);
+
+            container.innerHTML = pool.map((idx) => {
+              const asset = ASSETS[idx];
+              const active = idx === currentAssetIndex;
+              const activeClasses = active 
+                ? 'bg-[#1b2537] border-emerald-500/80 text-white shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/40' 
+                : 'bg-[#121722] border-[#20293b] text-slate-400 hover:text-slate-200';
+
+              const cachedPrice = PriceService.cache[asset.symbol] || asset.basePrice;
+              const formattedPrice = cachedPrice.toLocaleString(undefined, { 
+                maximumFractionDigits: Math.min(2, asset.decimals) 
+              });
+
+              return `
+                <button class="crypto-tab-btn btn-press shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all ${activeClasses}" data-index="${idx}">
+                  <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[11px] text-[#f3ba2f]">${asset.icon}</span>
+                  <div class="text-left">
+                    <div class="flex items-center gap-1 font-bold font-sans text-xs leading-none">
+                      <span>${asset.name}</span>
+                      <span class="text-[9px] font-mono text-slate-500 font-normal">#${asset.rank}</span>
+                      ${active ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5"></span>' : ''}
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-0.5 tabular-nums tab-price-${asset.symbol}">$${formattedPrice}</div>
+                  </div>
+                </button>
+              `;
+            }).join('');
+          },
+
+          seedHistory() {
+            RoundState.priceHistory = [];
+            const base = RoundState.currentPrice;
+            const pointsCount = 12;
+            let current = base * 0.998;
+            for (let i = 0; i < pointsCount; i++) {
+              current += (Math.random() - 0.49) * (base * 0.001);
+              RoundState.priceHistory.push({
+                time: i,
+                price: current
+              });
+            }
+            RoundState.priceHistory.push({
+              time: pointsCount,
+              price: base
+            });
+          },
+
+          async updateCurrentPrice() {
+            const asset = ASSETS[currentAssetIndex];
+            const price = await PriceService.fetchPrice(asset.symbol);
+            RoundState.currentPrice = price;
+
+            // Sync Header & Canvas UI Elements
+            const priceEl = document.getElementById('live-price-text');
+            if (priceEl) priceEl.textContent = `$${price.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
+
+            const symbolEl = document.getElementById('current-crypto-symbol');
+            if (symbolEl) symbolEl.textContent = asset.pair;
+
+            // Sync tab bar price
+            const tabPriceEl = document.querySelector(`.tab-price-${asset.symbol}`);
+            if (tabPriceEl) tabPriceEl.textContent = `$${price.toLocaleString(undefined, { maximumFractionDigits: asset.decimals })}`;
+
+            // Delta relative to lock or start
+            const referencePrice = RoundState.lockPrice !== null 
+              ? RoundState.lockPrice 
+              : RoundState.priceHistory[0]?.price || price;
+
+            const deltaPercent = ((price - referencePrice) / referencePrice) * 100;
+            const deltaEl = document.getElementById('price-delta-badge');
+            if (deltaEl) {
+              const sign = deltaPercent >= 0 ? '+' : '';
+              deltaEl.textContent = `${sign}${deltaPercent.toFixed(2)}%`;
+              deltaEl.className = `text-xs font-mono font-semibold tabular-nums ${deltaPercent >= 0 ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+            }
+
+            // Sync user bet status if active
+            this.syncUserBetBanner(deltaPercent);
+
+            // Append to chart history
+            RoundState.priceHistory.push({
+              time: RoundState.priceHistory.length,
+              price: price
+            });
+            if (RoundState.priceHistory.length > 50) {
+              RoundState.priceHistory.shift();
+            }
+          },
+
+          syncUserBetBanner(deltaPercent) {
+            const banner = document.getElementById('user-bet-status-banner');
+            if (!banner) return;
+
+            if (!RoundState.userBet) {
+              banner.classList.add('hidden');
+              return;
+            }
+
+            banner.classList.remove('hidden');
+            const bet = RoundState.userBet;
+            const isUp = bet.direction === 'UP';
+            const mult = isUp ? RoundState.pool.upMultiplier : RoundState.pool.downMultiplier;
+            const potentialWin = Math.floor(bet.amount * mult);
+
+            const isWinning = isUp ? (deltaPercent >= 0) : (deltaPercent <= 0);
+
+            banner.className = `rounded-xl p-2.5 border text-xs font-mono flex items-center justify-between transition-all ${
+              isWinning 
+                ? 'bg-emerald-500/10 border-emerald-500/30' 
+                : 'bg-red-500/10 border-red-500/30'
+            }`;
+
+            const iconEl = document.getElementById('user-bet-icon');
+            if (iconEl) iconEl.textContent = isUp ? '🚀' : '📉';
+
+            const titleEl = document.getElementById('user-bet-title');
+            if (titleEl) titleEl.textContent = `You predicted ${bet.direction} (${bet.amount} chips)`;
+
+            const subEl = document.getElementById('user-bet-subtitle');
+            if (subEl) subEl.textContent = `Potential Payout: ${potentialWin.toLocaleString()} chips (${mult}x)`;
+
+            const deltaBadge = document.getElementById('user-bet-delta');
+            if (deltaBadge) {
+              deltaBadge.textContent = isWinning ? 'IN PROFIT 🟢' : 'OUT OF MONEY 🔴';
+              deltaBadge.className = `text-right font-bold text-xs ${isWinning ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+            }
+          },
+
+          startRoundLoop() {
+            if (RoundState.roundTimer) clearInterval(RoundState.roundTimer);
+
+            const modeConfig = GAME_MODES[currentMode];
+            const asset = ASSETS[currentAssetIndex];
+            RoundState.secondsElapsed = 0;
+            RoundState.phase = 'BETTING';
+            RoundState.closePrice = null;
+            RoundState.userBet = null;
+
+            // The lock price is fixed at round OPEN — not after betting closes.
+            // The previous settlement price carries over as the new lock when the
+            // same market continues; otherwise the live price at open is the lock.
+            const carriesOver = RoundState.prevCloseSymbol === asset.symbol && RoundState.prevClosePrice !== null;
+            RoundState.lockPrice = carriesOver ? RoundState.prevClosePrice : RoundState.currentPrice;
+
+            // Generate realistic dynamic pool sizes
+            const baseUp = Math.floor(8000 + Math.random() * 12000);
+            const baseDown = Math.floor(8000 + Math.random() * 12000);
+            this.recalculatePool(baseUp, baseDown);
+
+            this.updateRoundUI();
+            Wallet.syncUI();
+
+            // Auto-scroll the tab strip so the active crypto is centered in view
+            setTimeout(() => {
+              const activeBtn = document.querySelector(`.crypto-tab-btn[data-index="${currentAssetIndex}"]`);
+              if (activeBtn) {
+                activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              }
+            }, 60);
+
+            RoundState.roundTimer = setInterval(async () => {
+              RoundState.secondsElapsed++;
+              const elapsed = RoundState.secondsElapsed;
+              const totalSec = modeConfig.totalSeconds;
+              const bettingSec = modeConfig.bettingSeconds;
+
+              // Micro price update during round to keep chart alive
+              this.simulatePriceTick();
+
+              // PHASE 1: BETTING WINDOW
+              if (elapsed < bettingSec) {
+                RoundState.phase = 'BETTING';
+                const remaining = bettingSec - elapsed;
+                this.updateTimerDisplay(remaining, 'Closes in:');
+
+                if (remaining <= 3) {
+                  AudioFX.countdownTick();
+                  TelegramController.haptic('light');
+                }
+              }
+              // PHASE 2: BETTING CLOSES (the lock price was already fixed at round open)
+              else if (elapsed === bettingSec) {
+                RoundState.phase = 'LOCKED';
+                this.closeBettingWindow();
+                AudioFX.lockTone();
+                TelegramController.haptic('medium');
+              }
+              // PHASE 3: LOCKED PHASE TRACKING
+              else if (elapsed < totalSec) {
+                RoundState.phase = 'LOCKED';
+                const remaining = totalSec - elapsed;
+                this.updateTimerDisplay(remaining, 'Settles in:');
+              }
+              // PHASE 4: SETTLEMENT
+              else {
+                clearInterval(RoundState.roundTimer);
+                await this.settleRound();
+              }
+
+              this.updateProgressBar(elapsed, totalSec);
+            }, modeConfig.tickInterval);
+          },
+
+          simulatePriceTick() {
+            // High fidelity micro-fluctuations simulating active orderbook
+            const asset = ASSETS[currentAssetIndex];
+            const volatility = asset.basePrice * 0.0003;
+            const delta = (Math.random() - 0.495) * volatility;
+            RoundState.currentPrice = Math.max(0.0001, RoundState.currentPrice + delta);
+
+            const priceEl = document.getElementById('live-price-text');
+            if (priceEl) priceEl.textContent = `$${RoundState.currentPrice.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
+
+            // Delta
+            const ref = RoundState.lockPrice || RoundState.priceHistory[0]?.price || RoundState.currentPrice;
+            const deltaPercent = ((RoundState.currentPrice - ref) / ref) * 100;
+            const deltaEl = document.getElementById('price-delta-badge');
+            if (deltaEl) {
+              const sign = deltaPercent >= 0 ? '+' : '';
+              deltaEl.textContent = `${sign}${deltaPercent.toFixed(2)}%`;
+              deltaEl.className = `text-xs font-mono font-semibold tabular-nums ${deltaPercent >= 0 ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+            }
+
+            this.syncUserBetBanner(deltaPercent);
+
+            RoundState.priceHistory.push({
+              time: RoundState.priceHistory.length,
+              price: RoundState.currentPrice
+            });
+            if (RoundState.priceHistory.length > 50) {
+              RoundState.priceHistory.shift();
+            }
+          },
+
+          closeBettingWindow() {
+            const asset = ASSETS[currentAssetIndex];
+            // Lock price was fixed at round open — never re-lock here
+            const price = RoundState.lockPrice !== null ? RoundState.lockPrice : RoundState.currentPrice;
+
+            // Disable Bet buttons
+            const btnUp = document.getElementById('btn-enter-up');
+            const btnDown = document.getElementById('btn-enter-down');
+            if (btnUp) btnUp.disabled = true;
+            if (btnDown) btnDown.disabled = true;
+
+            const badge = document.getElementById('round-phase-badge');
+            if (badge) {
+              badge.textContent = '🔒 Betting Closed · Tracking';
+              badge.className = '-ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30';
+            }
+
+            // Canvas message banner overlay
+            const overlay = document.getElementById('canvas-overlay-message');
+            if (overlay) {
+              overlay.classList.remove('opacity-0');
+              const sub = document.getElementById('overlay-sub');
+              if (sub) sub.textContent = `Locked at $${price.toFixed(asset.decimals)}. Tracking to settlement...`;
+              setTimeout(() => overlay.classList.add('opacity-0'), 2200);
+            }
+          },
+
+          async settleRound() {
+            const asset = ASSETS[currentAssetIndex];
+            // Final settlement REST query
+            const closePrice = await PriceService.fetchPrice(asset.symbol);
+            RoundState.closePrice = closePrice;
+            RoundState.currentPrice = closePrice;
+            RoundState.phase = 'SETTLED';
+
+            // The settled price becomes the lock price for the next round
+            RoundState.prevClosePrice = closePrice;
+            RoundState.prevCloseSymbol = asset.symbol;
+
+            const lockPrice = RoundState.lockPrice || RoundState.currentPrice;
+            const winningDirection = closePrice >= lockPrice ? 'UP' : 'DOWN';
+            const isExactTie = Math.abs(closePrice - lockPrice) < 0.00001;
+
+            let userWon = false;
+            let payout = 0;
+
+            if (RoundState.userBet) {
+              const bet = RoundState.userBet;
+              if (isExactTie) {
+                // Refund
+                Wallet.addChips(bet.amount);
+              } else if (bet.direction === winningDirection) {
+                userWon = true;
+                const mult = winningDirection === 'UP' ? RoundState.pool.upMultiplier : RoundState.pool.downMultiplier;
+                payout = Math.floor(bet.amount * mult);
+                Wallet.addChips(payout);
+                Wallet.recordResult(true, bet.amount, payout);
+              } else {
+                userWon = false;
+                Wallet.recordResult(false, bet.amount, 0);
+              }
+            }
+
+            // Record to History
+            const historyEntry = {
+              roundId: RoundState.roundId,
+              symbol: asset.name,
+              pair: asset.pair,
+              lockPrice: lockPrice,
+              closePrice: closePrice,
+              winner: winningDirection,
+              multiplier: winningDirection === 'UP' ? RoundState.pool.upMultiplier : RoundState.pool.downMultiplier,
+              userBet: RoundState.userBet ? { ...RoundState.userBet } : null,
+              userWon: userWon,
+              payout: payout,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            RoundState.historyList.unshift(historyEntry);
+            try {
+              localStorage.setItem('cf_tma_history', JSON.stringify(RoundState.historyList.slice(0, 30)));
+            } catch (e) {}
+            this.renderHistoryList();
+
+            // Trigger Celebration or Outcome Feedback
+            if (RoundState.userBet) {
+              if (userWon) {
+                AudioFX.winFanfare();
+                TelegramController.haptic('success');
+                this.showCelebrationModal(true, asset.name, winningDirection, payout);
+              } else {
+                AudioFX.lossTone();
+                TelegramController.haptic('error');
+                this.showCelebrationModal(false, asset.name, winningDirection, 0);
+              }
+            } else {
+              // Neutral settle
+              TelegramController.haptic('light');
+            }
+
+            // Check if user ran out of chips -> prompt Adsgram Faucet!
+            if (Wallet.chips <= 0) {
+              setTimeout(() => {
+                this.openFaucetModal(true);
+              }, 1200);
+            }
+
+            // Increment Round ID and switch to a fresh set of 5 markets (every 10 minutes)
+            RoundState.roundId++;
+            rotateMarketPool();
+            setTimeout(async () => {
+              this.renderCryptoTabs();
+              await this.updateCurrentPrice();
+              this.seedHistory();
+              this.startRoundLoop();
+            }, 3000);
+          },
+
+          showCelebrationModal(isWin, assetName, winner, payout) {
+            const modal = document.getElementById('win-celebration-modal');
+            if (!modal) return;
+
+            const iconEl = document.getElementById('celebration-icon');
+            const titleEl = document.getElementById('celebration-title');
+            const descEl = document.getElementById('celebration-desc');
+            const chipsEl = document.getElementById('celebration-chips');
+
+            if (isWin) {
+              if (iconEl) iconEl.textContent = '🎉';
+              if (titleEl) {
+                titleEl.textContent = 'ROUND WON!';
+                titleEl.className = 'text-xl font-extrabold text-emerald-400';
+              }
+              if (descEl) descEl.textContent = `Your ${winner} prediction on ${assetName} was spot on!`;
+              if (chipsEl) {
+                chipsEl.textContent = `+${payout.toLocaleString()} CHIPS`;
+                chipsEl.className = 'text-2xl font-extrabold text-emerald-400 tabular-nums';
+              }
+            } else {
+              if (iconEl) iconEl.textContent = '📉';
+              if (titleEl) {
+                titleEl.textContent = 'ROUND MISSED';
+                titleEl.className = 'text-xl font-extrabold text-[#f6465d]';
+              }
+              if (descEl) descEl.textContent = `Outcome was ${winner}. Don't give up, enter the next round!`;
+              if (chipsEl) {
+                chipsEl.textContent = `0 CHIPS`;
+                chipsEl.className = 'text-2xl font-extrabold text-slate-400 tabular-nums';
+              }
+            }
+
+            modal.classList.remove('hidden-modal');
+          },
+
+          renderHistoryList() {
+            const container = document.getElementById('round-history-list');
+            if (!container) return;
+
+            if (RoundState.historyList.length === 0) {
+              container.innerHTML = `
+                <div class="text-center py-6 text-slate-500 font-mono text-xs bg-[#10141f] rounded-2xl border border-[#1b2333]">
+                  No settled rounds yet. Predictions settle every 10 minutes!
+                </div>
+              `;
+              return;
+            }
+
+            container.innerHTML = RoundState.historyList.slice(0, 8).map(item => {
+              const isUp = item.winner === 'UP';
+              const outcomeBadge = isUp 
+                ? '<span class="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">UP ▲</span>'
+                : '<span class="text-[#f6465d] font-bold bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[10px]">DOWN ▼</span>';
+
+              let userResultBadge = '';
+              if (item.userBet) {
+                if (item.userWon) {
+                  userResultBadge = `<span class="text-emerald-400 font-bold text-xs">+${item.payout.toLocaleString()} chips 🟢</span>`;
+                } else {
+                  userResultBadge = `<span class="text-[#f6465d] font-bold text-xs">-${item.userBet.amount} chips 🔴</span>`;
+                }
+              } else {
+                userResultBadge = `<span class="text-slate-500 text-[10px]">No Bet Placed</span>`;
+              }
+
+              return `
+                <div class="bg-[#121723] rounded-xl p-3 border border-[#20293a] flex items-center justify-between font-mono text-xs">
+                  <div class="flex items-center gap-2.5">
+                    ${outcomeBadge}
+                    <div>
+                      <div class="font-sans font-bold text-white text-xs">Round #${item.roundId} · ${item.symbol}</div>
+                      <div class="text-[10px] text-slate-400 mt-0.5">
+                        Lock: $${item.lockPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} → Close: $${item.closePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="text-right">
+                    ${userResultBadge}
+                    <div class="text-[10px] text-slate-500 mt-0.5">${item.multiplier}x payout · ${item.timestamp}</div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          },
+
+          recalculatePool(upPool, downPool) {
+            RoundState.pool.up = upPool;
+            RoundState.pool.down = downPool;
+            const total = upPool + downPool;
+
+            // PancakeSwap-style multiplier calculation with 3% platform fee
+            const netPool = total * 0.97;
+            const upMult = Math.max(1.1, parseFloat((netPool / Math.max(upPool, 1)).toFixed(2)));
+            const downMult = Math.max(1.1, parseFloat((netPool / Math.max(downPool, 1)).toFixed(2)));
+
+            RoundState.pool.upMultiplier = upMult;
+            RoundState.pool.downMultiplier = downMult;
+
+            const upPct = Math.round((upPool / total) * 100);
+            const downPct = 100 - upPct;
+
+            const upMultEl = document.getElementById('up-payout-mult');
+            if (upMultEl) upMultEl.textContent = `${upMult}x`;
+            const btnUpMult = document.getElementById('btn-up-mult');
+            if (btnUpMult) btnUpMult.textContent = `${upMult}x`;
+
+            const downMultEl = document.getElementById('down-payout-mult');
+            if (downMultEl) downMultEl.textContent = `${downMult}x`;
+            const btnDownMult = document.getElementById('btn-down-mult');
+            if (btnDownMult) btnDownMult.textContent = `${downMult}x`;
+
+            const poolTotalEl = document.getElementById('total-pool-display');
+            if (poolTotalEl) poolTotalEl.textContent = total.toLocaleString();
+
+            const upBar = document.getElementById('pool-up-bar');
+            if (upBar) upBar.style.width = `${upPct}%`;
+            const downBar = document.getElementById('pool-down-bar');
+            if (downBar) downBar.style.width = `${downPct}%`;
+
+            const upPctEl = document.getElementById('pool-up-percent');
+            if (upPctEl) upPctEl.textContent = `${upPct}% UP`;
+            const downPctEl = document.getElementById('pool-down-percent');
+            if (downPctEl) downPctEl.textContent = `${downPct}% DOWN`;
+          },
+
+          updateTimerDisplay(seconds, label = 'Closes in:') {
+            const timerEl = document.getElementById('round-timer-display');
+            const descEl = document.getElementById('timer-desc');
+            if (descEl) descEl.textContent = label;
+            if (timerEl) {
+              const mins = Math.floor(seconds / 60);
+              const secs = seconds % 60;
+              timerEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+          },
+
+          updateProgressBar(elapsed, total) {
+            const bar = document.getElementById('round-progress-bar');
+            if (bar) {
+              const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+              bar.style.width = `${pct}%`;
+            }
+          },
+
+          updateRoundUI() {
+            const asset = ASSETS[currentAssetIndex];
+            const roundNumEl = document.getElementById('round-number-tag');
+            if (roundNumEl) roundNumEl.textContent = `Round #${RoundState.roundId} · ${asset.name} (#${asset.rank})`;
+
+            const badge = document.getElementById('round-phase-badge');
+            if (badge) {
+              badge.textContent = '🟢 Betting Open';
+              badge.className = '-ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            }
+
+            const lockEl = document.getElementById('lock-price-text');
+            if (lockEl) {
+              if (RoundState.lockPrice !== null) {
+                lockEl.textContent = `$${RoundState.lockPrice.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
+                lockEl.className = 'text-xs font-bold font-mono text-amber-300 tabular-nums';
+              } else {
+                lockEl.textContent = 'Pending Lock';
+                lockEl.className = 'text-xs font-bold font-mono text-slate-300 tabular-nums';
+              }
+            }
+
+            const btnUp = document.getElementById('btn-enter-up');
+            const btnDown = document.getElementById('btn-enter-down');
+            if (btnUp) btnUp.disabled = false;
+            if (btnDown) btnDown.disabled = false;
+
+            const banner = document.getElementById('user-bet-status-banner');
+            if (banner) banner.classList.add('hidden');
+          },
+
+          placeBet(direction) {
+            if (RoundState.phase !== 'BETTING') {
+              TelegramController.haptic('error');
+              return;
+            }
+
+            if (RoundState.userBet) {
+              alert('You have already placed a prediction for this round!');
+              return;
+            }
+
+            const amount = selectedChipAmount === 'MAX' ? Wallet.chips : selectedChipAmount;
+            if (amount <= 0) {
+              this.openFaucetModal(true);
+              return;
+            }
+
+            if (amount > Wallet.chips) {
+              alert(`Insufficient chips! Your balance is ${Wallet.chips} chips.`);
+              this.openFaucetModal(true);
+              return;
+            }
+
+            // Deduct
+            Wallet.deductChips(amount);
+            RoundState.userBet = {
+              direction: direction,
+              amount: amount,
+              assetName: ASSETS[currentAssetIndex].name,
+              pair: ASSETS[currentAssetIndex].pair,
+              timestamp: Date.now()
+            };
+            Wallet.syncUI();
+
+            // Recalculate dynamic pool
+            if (direction === 'UP') {
+              this.recalculatePool(RoundState.pool.up + amount, RoundState.pool.down);
+            } else {
+              this.recalculatePool(RoundState.pool.up, RoundState.pool.down + amount);
+            }
+
+            AudioFX.betPlaced();
+            TelegramController.haptic('medium');
+
+            // Feedback
+            this.syncUserBetBanner(0);
+          },
+
+          openFaucetModal(isOpen) {
+            const modal = document.getElementById('faucet-modal');
+            if (modal) {
+              if (isOpen) {
+                Wallet.ensureRewardDay();
+                Wallet.syncRewardsUI();
+                modal.classList.remove('hidden-modal');
+                TelegramController.haptic('light');
+              } else {
+                modal.classList.add('hidden-modal');
+              }
+            }
+          },
+
+          bindEvents() {
+            // Sound Toggle
+            const soundBtn = document.getElementById('sound-toggle-btn');
+            const soundIcon = document.getElementById('sound-icon');
+            if (soundBtn) {
+              soundBtn.addEventListener('click', () => {
+                AudioFX.enabled = !AudioFX.enabled;
+                TelegramController.haptic('selection');
+                if (soundIcon) soundIcon.textContent = AudioFX.enabled ? '🔊' : '🔇';
+              });
+            }
+
+            // Crypto Tab Selection (5 active markets)
+            const tabBar = document.getElementById('crypto-tab-bar');
+            if (tabBar) {
+              tabBar.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.crypto-tab-btn');
+                if (!btn) return;
+                const idx = parseInt(btn.getAttribute('data-index'), 10);
+                if (idx !== currentAssetIndex && !isNaN(idx) && isInRotation(idx)) {
+                  if (RoundState.userBet) {
+                    TelegramController.haptic('error');
+                    alert(`You have an open position (${RoundState.userBet.assetName}: ${RoundState.userBet.direction}). Wait for it to settle before switching markets.`);
+                    return;
+                  }
+                  currentAssetIndex = idx;
+                  TelegramController.haptic('selection');
+                  AudioFX.click();
+                  this.renderCryptoTabs();
+                  await this.updateCurrentPrice();
+                  // New market = new lock price taken at switch time
+                  RoundState.lockPrice = RoundState.currentPrice;
+                  this.seedHistory();
+                  this.updateRoundUI();
+                  const activeBtn = document.querySelector(`.crypto-tab-btn[data-index="${currentAssetIndex}"]`);
+                  if (activeBtn) {
+                    activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                  }
+                }
+              });
+            }
+
+            // Enter UP & DOWN buttons
+            const btnUp = document.getElementById('btn-enter-up');
+            if (btnUp) {
+              btnUp.addEventListener('click', () => this.placeBet('UP'));
+            }
+
+            const btnDown = document.getElementById('btn-enter-down');
+            if (btnDown) {
+              btnDown.addEventListener('click', () => this.placeBet('DOWN'));
+            }
+
+            // Chip Selector Buttons
+            const chipContainer = document.getElementById('chip-buttons-container');
+            const selectedDisplay = document.getElementById('selected-bet-display');
+            if (chipContainer) {
+              chipContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.chip-btn');
+                if (!btn) return;
+                const amt = btn.getAttribute('data-amount');
+                selectedChipAmount = amt === 'MAX' ? 'MAX' : parseInt(amt, 10);
+                TelegramController.haptic('selection');
+                AudioFX.click();
+
+                // Highlight active button
+                document.querySelectorAll('.chip-btn').forEach(b => {
+                  b.className = 'chip-btn btn-press py-2 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 hover:text-white transition-all text-center';
+                });
+                btn.className = 'chip-btn btn-press py-2 rounded-xl bg-[#1d273a] border border-[#f3ba2f] text-[#f3ba2f] transition-all text-center shadow-xs font-bold';
+
+                if (selectedDisplay) {
+                  selectedDisplay.textContent = amt === 'MAX' ? `MAX (${Wallet.chips})` : amt;
+                }
+              });
+            }
+
+            // Adsgram Rewarded Video Integration Trigger (max 3 per day)
+            const watchAdBtn = document.getElementById('watch-ad-btn');
+            const watchAdLabel = document.getElementById('watch-ad-label');
+            if (watchAdBtn) {
+              watchAdBtn.addEventListener('click', () => {
+                Wallet.ensureRewardDay();
+                if (Wallet.adsRemaining() <= 0) {
+                  TelegramController.haptic('error');
+                  alert(`You have reached today's limit of ${MAX_DAILY_ADS} sponsored ads. Come back tomorrow!`);
+                  Wallet.syncRewardsUI();
+                  return;
+                }
+
+                TelegramController.haptic('medium');
+                if (watchAdLabel) watchAdLabel.textContent = 'Loading Sponsor Ad...';
+
+                // Check Adsgram SDK
+                if (window.Adsgram && typeof window.Adsgram.init === 'function') {
+                  try {
+                    const AdController = window.Adsgram.init({ blockId: "int-crypto-flip-sample" });
+                    AdController.show().then((result) => {
+                      // Reward User (counts toward the daily ad limit)
+                      Wallet.recordAdWatch();
+                      Wallet.addChips(AD_REWARD_CHIPS);
+                      AudioFX.winFanfare();
+                      TelegramController.haptic('success');
+                      this.openFaucetModal(false);
+                      alert(`🎉 Reward Claimed: +${AD_REWARD_CHIPS.toLocaleString()} chips added! ${Wallet.adsRemaining()} of ${MAX_DAILY_ADS} ads left today.`);
+                    }).catch((err) => {
+                      console.warn('Adsgram show fallback:', err);
+                      // Graceful test fallback so user never gets stuck
+                      this.simulateRewardedAd();
+                    });
+                  } catch (e) {
+                    this.simulateRewardedAd();
+                  }
+                } else {
+                  this.simulateRewardedAd();
+                }
+              });
+            }
+
+            // Daily Reward Claim Button
+            const claimDailyBtn = document.getElementById('claim-daily-btn');
+            if (claimDailyBtn) {
+              claimDailyBtn.addEventListener('click', () => {
+                if (Wallet.rewards.dailyClaimed) {
+                  TelegramController.haptic('error');
+                  alert('You have already claimed your daily reward. Come back tomorrow!');
+                  return;
+                }
+                if (Wallet.claimDailyReward()) {
+                  AudioFX.winFanfare();
+                  TelegramController.haptic('success');
+                  this.openFaucetModal(false);
+                  alert(`🎁 Daily Reward Claimed: +${DAILY_REWARD_CHIPS.toLocaleString()} chips added!`);
+                }
+              });
+            }
+
+            // Invite / share button
+            // Opens the invite-link modal (Mini App invite URL once deployed).
+            // The generic win-share flow is still used by the celebration screen.
+            const tgShareBtn = document.getElementById('tg-share-btn');
+            if (tgShareBtn) {
+              tgShareBtn.addEventListener('click', () => {
+                TelegramController.haptic('light');
+                openInviteModal();
+              });
+            }
+
+            // Invite modal triggers
+            const inviteModalEl = document.getElementById('invite-modal');
+            if (inviteModalEl) {
+              const closeInviteBtn = document.getElementById('close-invite-modal');
+              if (closeInviteBtn) {
+                closeInviteBtn.addEventListener('click', () => {
+                  TelegramController.haptic('light');
+                  InviteModal.close();
+                });
+              }
+
+              inviteModalEl.addEventListener('click', (e) => {
+                if (e.target === inviteModalEl) {
+                  InviteModal.close();
+                }
+              });
+
+              document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !inviteModalEl.classList.contains('hidden-modal')) {
+                  InviteModal.close();
+                }
+              });
+            }
+
+            const copyInviteBtn = document.getElementById('copy-invite-link-btn');
+            if (copyInviteBtn) {
+              copyInviteBtn.addEventListener('click', () => {
+                TelegramController.haptic('light');
+                InviteModal.copyLink();
+              });
+            }
+
+            const shareInviteBtn = document.getElementById('share-invite-to-tg-btn');
+            if (shareInviteBtn) {
+              shareInviteBtn.addEventListener('click', () => {
+                TelegramController.haptic('light');
+                InviteModal.shareToTelegram();
+              });
+            }
+
+            const inviteClaimBtn = document.getElementById('claim-invite-reward-btn');
+            if (inviteClaimBtn) {
+              inviteClaimBtn.addEventListener('click', () => {
+                if (!Wallet.isInviteReady()) {
+                  TelegramController.haptic('error');
+                  alert('Invite rewards require a live Mini App invite link. Set one with setInviteLink(...) when the Mini App is deployed.');
+                  return;
+                }
+                if (Wallet.invitesRemaining() <= 0) {
+                  TelegramController.haptic('error');
+                  alert('You have already claimed all invite rewards for now.');
+                  return;
+                }
+                if (Wallet.claimInviteReward()) {
+                  AudioFX.winFanfare();
+                  TelegramController.haptic('success');
+                  alert(`🎉 Invite Reward Claimed: +${INVITE_REWARD_CHIPS.toLocaleString()} chips added! ${Wallet.invitesRemaining()} of ${MAX_INVITE_REWARDS} invite rewards left today.`);
+                }
+              });
+            }
+
+            // Faucet modal triggers
+            const getFreeChipsBtn = document.getElementById('get-free-chips-btn');
+            if (getFreeChipsBtn) {
+              getFreeChipsBtn.addEventListener('click', () => this.openFaucetModal(true));
+            }
+            const heroRefillBtn = document.getElementById('hero-refill-btn');
+            if (heroRefillBtn) {
+              heroRefillBtn.addEventListener('click', () => this.openFaucetModal(true));
+            }
+            const chipsBalanceBtn = document.getElementById('chips-balance-btn');
+            if (chipsBalanceBtn) {
+              chipsBalanceBtn.addEventListener('click', () => this.openFaucetModal(true));
+            }
+            const closeFaucetBtn = document.getElementById('close-faucet-modal');
+            if (closeFaucetBtn) {
+              closeFaucetBtn.addEventListener('click', () => this.openFaucetModal(false));
+            }
+
+            // Games modal triggers
+            const heroGamesBtn = document.getElementById('hero-games-btn');
+            if (heroGamesBtn) {
+              heroGamesBtn.addEventListener('click', () => this.openGamesModal(true));
+            }
+            const closeGamesModal = document.getElementById('close-games-modal');
+            const closeGamesBtn = document.getElementById('close-games-btn');
+            if (closeGamesModal) {
+              closeGamesModal.addEventListener('click', () => this.openGamesModal(false));
+            }
+            if (closeGamesBtn) {
+              closeGamesBtn.addEventListener('click', () => this.openGamesModal(false));
+            }
+
+            // Celebration Modal dismissal and share
+            const dismissBtn = document.getElementById('celebration-dismiss-btn');
+            if (dismissBtn) {
+              dismissBtn.addEventListener('click', () => {
+                document.getElementById('win-celebration-modal')?.classList.add('hidden-modal');
+              });
+            }
+            const celebrationShareBtn = document.getElementById('celebration-share-btn');
+            if (celebrationShareBtn) {
+              celebrationShareBtn.addEventListener('click', () => {
+                TelegramController.haptic('light');
+                const text = `🚀 Just won big on CryptoFlip TMA! Nailed the 10-minute round on ${ASSETS[currentAssetIndex].name}! Check it out:`;
+                TelegramController.shareWin(text);
+              });
+            }
+
+            // Reset stats button
+            const clearHistoryBtn = document.getElementById('clear-history-btn');
+            if (clearHistoryBtn) {
+              clearHistoryBtn.addEventListener('click', () => {
+                if (confirm('Reset your prediction record stats and history?')) {
+                  Wallet.resetStats();
+                  try {
+                    localStorage.removeItem('cf_tma_history');
+                  } catch (e) {}
+                  RoundState.historyList = [];
+                  this.renderHistoryList();
+                  TelegramController.haptic('light');
+                }
+              });
+            }
+
+            // Bottom Nav Tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+              tab.addEventListener('click', () => {
+                const view = tab.getAttribute('data-view');
+                TelegramController.haptic('selection');
+                if (view === 'faucet') {
+                  this.openFaucetModal(true);
+                } else if (view === 'missions') {
+                  this.openMissionsModal(true);
+                } else if (view === 'leaderboard') {
+                  document.getElementById('ranks-modal')?.classList.remove('hidden-modal');
+                } else if (view === 'history') {
+                  document.getElementById('round-history-list')?.scrollIntoView({ behavior: 'smooth' });
+                } else if (view === 'game') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              });
+            });
+
+            // Close Ranks Modal
+            const closeRanksModal = document.getElementById('close-ranks-modal');
+            const closeRanksBtn = document.getElementById('close-ranks-btn');
+            if (closeRanksModal) {
+              closeRanksModal.addEventListener('click', () => {
+                document.getElementById('ranks-modal')?.classList.add('hidden-modal');
+              });
+            }
+            if (closeRanksBtn) {
+              closeRanksBtn.addEventListener('click', () => {
+                document.getElementById('ranks-modal')?.classList.add('hidden-modal');
+              });
+            }
+
+            // Missions Modal: open/close + claim buttons
+            const closeMissionsModal = document.getElementById('close-missions-modal');
+            const closeMissionsBtn = document.getElementById('close-missions-btn');
+            if (closeMissionsModal) {
+              closeMissionsModal.addEventListener('click', () => this.openMissionsModal(false));
+            }
+            if (closeMissionsBtn) {
+              closeMissionsBtn.addEventListener('click', () => this.openMissionsModal(false));
+            }
+
+            const missionsList = document.getElementById('missions-list');
+            if (missionsList) {
+              missionsList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.mission-claim-btn');
+                if (!btn) return;
+                const missionId = btn.getAttribute('data-mission');
+                const mission = MISSIONS.find((m) => m.id === missionId);
+                if (!mission) return;
+
+                if (Wallet.claimMission(missionId)) {
+                  AudioFX.winFanfare();
+                  TelegramController.haptic('success');
+                  alert(`🎯 Mission complete: +${mission.reward.toLocaleString()} chips added!`);
+                } else {
+                  TelegramController.haptic('error');
+                }
+              });
+            }
+          },
+
+          openMissionsModal(isOpen) {
+            const modal = document.getElementById('missions-modal');
+            if (!modal) return;
+            if (isOpen) {
+              Wallet.renderMissions();
+              modal.classList.remove('hidden-modal');
+              TelegramController.haptic('light');
+            } else {
+              modal.classList.add('hidden-modal');
+            }
+          },
+
+          openGamesModal(isOpen) {
+            const modal = document.getElementById('games-modal');
+            if (!modal) return;
+            if (isOpen) {
+              modal.classList.remove('hidden-modal');
+              TelegramController.haptic('light');
+            } else {
+              modal.classList.add('hidden-modal');
+            }
+          },
+
+          simulateRewardedAd() {
+            const watchAdLabel = document.getElementById('watch-ad-label');
+            if (watchAdLabel) watchAdLabel.textContent = 'Playing Sponsor Ad (2s)...';
+            setTimeout(() => {
+              if (Wallet.adsRemaining() <= 0) {
+                Wallet.syncRewardsUI();
+                return;
+              }
+              Wallet.recordAdWatch();
+              Wallet.addChips(AD_REWARD_CHIPS);
+              AudioFX.winFanfare();
+              TelegramController.haptic('success');
+              this.openFaucetModal(false);
+              alert(`🎉 +${AD_REWARD_CHIPS.toLocaleString()} chips credited! ${Wallet.adsRemaining()} of ${MAX_DAILY_ADS} ads left today.`);
+            }, 1800);
+          }
+        };
+
+        // ==========================================
+        // 8. BOOTSTRAP APPLICATION
+        // ==========================================
+        // Restore any invite link persisted on the device (set once via setInviteLink).
+        try {
+          const stored = localStorage.getItem('cryptoFlip_invite_link');
+          if (stored) {
+            INVITE_LINK = stored;
+          }
+        } catch (e) {
+          console.warn('Could not read persisted invite link:', e);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+          TelegramController.init();
+          AudioFX.init();
+          Wallet.load();
+          CanvasChart.init();
+          GameEngine.init();
+
+          // Minimal wallet API so the RocketCrash mini-game shares the same chips
+          window.CFWallet = {
+            getChips: () => Wallet.chips,
+            addChips: (amount) => Wallet.addChips(amount),
+            deductChips: (amount) => Wallet.deductChips(amount),
+          };
+        });
+
+      })();
+    </script>
+    <!-- ROCKETCRASH MINI-GAME (client-side only) -->
+    <script>
+      (function () {
+        'use strict';
+
+        // ==========================================
+        // CONFIG — tweak the house edge / limits here
+        // ==========================================
+        const STORAGE_KEY = 'cf_tma_rocket_v1';
+        const INSTANT_CRASH_CHANCE = 0.03;  // 3% instant crash at 1.00x
+        const MAX_MULTIPLIER = 100;         // hard cap on the crash point
+        const BETTING_SECONDS = 5;          // State 1 countdown
+        const CRASH_PAUSE_MS = 3000;        // State 3 pause before reset
+        const HISTORY_LIMIT = 15;
+        const GROWTH = 1.2;                 // multiplier per second
+
+        const $ = (id) => document.getElementById(id);
+        const canvas = $('rc-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const gamesModal = $('games-modal');
+        const multEl = $('rc-multiplier');
+        const statusEl = $('rc-status');
+        const balanceEl = $('rc-balance');
+        const historyEl = $('rc-history');
+        const betInput = $('rc-bet');
+        const autoInput = $('rc-auto');
+        const autoToggle = $('rc-auto-toggle');
+        const actionBtn = $('rc-action');
+        const roundsEl = $('rc-rounds');
+        const wlEl = $('rc-wl');
+        const highEl = $('rc-high');
+
+        const BTN_BASE = 'btn-press w-full py-3 rounded-xl font-extrabold text-sm transition-all disabled:opacity-40 disabled:pointer-events-none';
+
+        // ==========================================
+        // STATE
+        // ==========================================
+        const game = {
+          bet: 10,
+          auto: 2,
+          autoOn: true,
+          state: 'IDLE',        // IDLE | FLYING | CRASHED
+          multiplier: 1,
+          crashPoint: 1,
+          cashMultiplier: 0,
+          hasBet: false,
+          cashedOut: false,
+          countdown: BETTING_SECONDS,
+          roundStart: 0,
+          history: [],
+          stats: { played: 0, wins: 0, losses: 0, high: 1 },
+          trail: [],
+          particles: [],
+          shakeUntil: 0,
+        };
+
+        let countdownTimer = null;
+        let resetTimer = null;
+        let lastBtnCents = -1;
+        let lastBtnAt = 0;
+        let lastMultClass = '';
+
+        // ==========================================
+        // PERSISTENCE
+        // ==========================================
+        function load() {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            if (Array.isArray(saved.history)) {
+              game.history = saved.history
+                .filter((v) => typeof v === 'number' && isFinite(v))
+                .slice(0, HISTORY_LIMIT);
+            }
+            if (saved.stats) {
+              game.stats.played = Math.max(0, parseInt(saved.stats.played, 10) || 0);
+              game.stats.wins = Math.max(0, parseInt(saved.stats.wins, 10) || 0);
+              game.stats.losses = Math.max(0, parseInt(saved.stats.losses, 10) || 0);
+              game.stats.high = Math.max(1, parseFloat(saved.stats.high) || 1);
+            }
+            if (typeof saved.bet === 'number' && saved.bet > 0) game.bet = saved.bet;
+            if (typeof saved.auto === 'number' && saved.auto >= 0) game.auto = saved.auto;
+            if (typeof saved.autoOn === 'boolean') game.autoOn = saved.autoOn;
+          } catch (e) {}
+        }
+
+        function save() {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+              bet: game.bet,
+              auto: game.auto,
+              autoOn: game.autoOn,
+              history: game.history,
+              stats: game.stats,
+            }));
+          } catch (e) {}
+        }
+
+        // ==========================================
+        // ODDS / PROBABILITY ENGINE
+        // ==========================================
+        function generateCrashPoint() {
+          // House edge: a fixed chance to bust instantly at 1.00x
+          if (Math.random() < INSTANT_CRASH_CHANCE) return 1;
+          // Exponential curve: 0.99 / (1 - rand), capped
+          const raw = 0.99 / (1 - Math.random());
+          const capped = Math.min(MAX_MULTIPLIER, Math.max(1, raw));
+          return Math.floor(capped * 100) / 100;
+        }
+
+        // ==========================================
+        // WALLET BRIDGE — shares the CryptoFlip chips
+        // ==========================================
+        function getChips() {
+          if (window.CFWallet && typeof window.CFWallet.getChips === 'function') {
+            return Math.max(0, Math.floor(window.CFWallet.getChips()));
+          }
+          try {
+            const raw = localStorage.getItem('cf_tma_chips');
+            return raw === null ? 0 : Math.max(0, parseInt(raw, 10) || 0);
+          } catch (e) {
+            return 0;
+          }
+        }
+
+        function addChips(amount) {
+          if (window.CFWallet && typeof window.CFWallet.addChips === 'function') {
+            window.CFWallet.addChips(amount);
+            return true;
+          }
+          return false;
+        }
+
+        function deductChips(amount) {
+          if (window.CFWallet && typeof window.CFWallet.deductChips === 'function') {
+            return window.CFWallet.deductChips(amount);
+          }
+          return false;
+        }
+
+        // ==========================================
+        // UI SYNC
+        // ==========================================
+        function chips(v) {
+          return Math.floor(v).toLocaleString();
+        }
+
+        function syncBalance() {
+          if (balanceEl) balanceEl.textContent = chips(getChips());
+        }
+
+        function syncStats() {
+          if (roundsEl) roundsEl.textContent = String(game.stats.played);
+          if (wlEl) wlEl.textContent = `${game.stats.wins}W/${game.stats.losses}L`;
+          if (highEl) highEl.textContent = `${game.stats.high.toFixed(2)}x`;
+        }
+
+        function syncAutoControl() {
+          if (autoToggle) autoToggle.checked = game.autoOn;
+          if (autoInput) {
+            autoInput.disabled = !game.autoOn;
+            autoInput.style.opacity = game.autoOn ? '1' : '0.4';
+          }
+        }
+
+        function renderHistory() {
+          if (!historyEl) return;
+          if (!game.history.length) {
+            historyEl.innerHTML = '<span class="text-[10px] font-mono text-slate-600 px-1">No rounds yet</span>';
+            return;
+          }
+          historyEl.innerHTML = game.history.map((v) => {
+            let cls = 'bg-[#f6465d]/15 text-[#f6465d] border-[#f6465d]/25';
+            if (v >= 10) cls = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            else if (v >= 2) cls = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25';
+            return `<span class="shrink-0 px-1.5 py-0.5 rounded-md border text-[10px] font-mono font-bold tabular-nums ${cls}">${v.toFixed(2)}x</span>`;
+          }).join('');
+        }
+
+        function syncStatus() {
+          if (!statusEl) return;
+          if (game.state === 'IDLE') {
+            statusEl.textContent = game.hasBet
+              ? `Bet locked · launching in ${game.countdown}s`
+              : `Place your bet · starting in ${game.countdown}s`;
+          } else if (game.state === 'FLYING') {
+            if (game.cashedOut) {
+              statusEl.textContent = `Cashed out at ${game.cashMultiplier.toFixed(2)}x`;
+            } else if (game.hasBet) {
+              statusEl.textContent = (game.autoOn && game.auto >= 1.01)
+                ? `Flying — auto cash-out at ${game.auto.toFixed(2)}x`
+                : 'Flying — cash out any time';
+            } else {
+              statusEl.textContent = 'Round in progress — waiting for next round…';
+            }
+          } else {
+            statusEl.textContent = `Crashed at ${game.crashPoint.toFixed(2)}x`;
+          }
+        }
+
+        function updateAction(force) {
+          if (!actionBtn) return;
+
+          if (game.state === 'IDLE') {
+            if (game.hasBet) {
+              actionBtn.disabled = true;
+              actionBtn.textContent = 'Bet Locked ✓';
+              actionBtn.className = BTN_BASE + ' bg-[#1a2230] text-slate-400 border border-[#243044]';
+            } else {
+              actionBtn.disabled = getChips() < 1;
+              actionBtn.textContent = `Place Bet (${chips(game.bet)})`;
+              actionBtn.className = BTN_BASE + ' bg-gradient-to-r from-emerald-500 to-emerald-600 text-black shadow-lg shadow-emerald-500/20';
+            }
+          } else if (game.state === 'FLYING') {
+            if (game.hasBet && !game.cashedOut) {
+              const now = performance.now();
+              if (!force && now - lastBtnAt < 80) return;
+              lastBtnAt = now;
+              actionBtn.disabled = false;
+              actionBtn.textContent = `CASH OUT (${chips(game.bet * game.multiplier)})`;
+              actionBtn.className = BTN_BASE + ' bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-lg shadow-amber-500/30';
+            } else if (game.cashedOut) {
+              actionBtn.disabled = true;
+              actionBtn.textContent = `Cashed Out ${game.cashMultiplier.toFixed(2)}x`;
+              actionBtn.className = BTN_BASE + ' bg-[#1a2230] text-emerald-400 border border-emerald-500/25';
+            } else {
+              actionBtn.disabled = true;
+              actionBtn.textContent = 'Waiting for next round…';
+              actionBtn.className = BTN_BASE + ' bg-[#1a2230] text-slate-400 border border-[#243044]';
+            }
+          } else {
+            actionBtn.disabled = true;
+            actionBtn.textContent = `Crashed at ${game.crashPoint.toFixed(2)}x`;
+            actionBtn.className = BTN_BASE + ' bg-[#1a2230] text-[#f6465d] border border-[#f6465d]/25';
+          }
+        }
+
+        function updateMultiplierText() {
+          if (!multEl) return;
+          const m = game.multiplier;
+          const txt = `${m.toFixed(2)}x`;
+          if (multEl.textContent !== txt) multEl.textContent = txt;
+          const scale = 1 + Math.min(0.35, Math.max(0, (m - 1) * 0.03));
+          multEl.style.transform = `scale(${scale.toFixed(3)})`;
+
+          if (game.state === 'FLYING') {
+            const cls = 'text-4xl font-extrabold font-mono tabular-nums transition-transform duration-100 will-change-transform ' +
+              (game.cashedOut
+                ? 'text-amber-300 drop-shadow-[0_0_18px_rgba(243,186,47,0.45)]'
+                : 'text-white drop-shadow-[0_0_18px_rgba(16,185,129,0.35)]');
+            if (cls !== lastMultClass) {
+              lastMultClass = cls;
+              multEl.className = cls;
+            }
+          }
+        }
+
+        // ==========================================
+        // ROUND FLOW
+        // ==========================================
+        function startBettingPhase() {
+          if (resetTimer) { clearTimeout(resetTimer); resetTimer = null; }
+          if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+
+          game.state = 'IDLE';
+          game.hasBet = false;
+          game.cashedOut = false;
+          game.multiplier = 1;
+          game.crashPoint = 1;
+          game.cashMultiplier = 0;
+          game.countdown = BETTING_SECONDS;
+          game.trail = [];
+          game.particles = [];
+          game.shakeUntil = 0;
+          lastBtnCents = -1;
+          lastMultClass = '';
+
+          if (multEl) {
+            multEl.textContent = '1.00x';
+            multEl.style.transform = 'scale(1)';
+            multEl.className = 'text-4xl font-extrabold font-mono text-white tabular-nums drop-shadow-[0_0_18px_rgba(16,185,129,0.35)] transition-transform duration-100 will-change-transform';
+          }
+          syncStatus();
+          updateAction(true);
+
+          countdownTimer = setInterval(() => {
+            game.countdown--;
+            if (game.countdown <= 0) {
+              clearInterval(countdownTimer);
+              countdownTimer = null;
+              startFlight();
+            } else {
+              syncStatus();
+              updateAction(true);
+            }
+          }, 1000);
+        }
+
+        function startFlight() {
+          game.state = 'FLYING';
+          game.crashPoint = generateCrashPoint();
+          game.multiplier = 1;
+          game.cashMultiplier = 0;
+          game.roundStart = performance.now();
+          game.trail = [];
+          game.particles = [];
+          if (game.hasBet) game.stats.played++;
+          syncStats();
+          save();
+          syncStatus();
+          updateAction(true);
+        }
+
+        function placeBet() {
+          if (game.state !== 'IDLE' || game.hasBet) return;
+          const amount = Math.max(1, Math.floor(game.bet));
+          if (amount > getChips() || !deductChips(amount)) {
+            if (statusEl) statusEl.textContent = 'Not enough chips for that bet';
+            return;
+          }
+          game.bet = amount;
+          game.hasBet = true;
+          game.cashedOut = false;
+          save();
+          syncBalance();
+          syncStatus();
+          updateAction(true);
+        }
+
+        function cashOut() {
+          if (game.state !== 'FLYING' || !game.hasBet || game.cashedOut) return;
+          game.cashedOut = true;
+          game.cashMultiplier = game.multiplier;
+
+          const payout = Math.max(0, Math.floor(game.bet * game.multiplier));
+          addChips(payout);
+          game.stats.wins++;
+          if (game.multiplier > game.stats.high) game.stats.high = game.multiplier;
+
+          save();
+          syncBalance();
+          syncStats();
+          syncStatus();
+          updateAction(true);
+        }
+
+        function crash() {
+          game.state = 'CRASHED';
+          game.multiplier = game.crashPoint;
+          game.shakeUntil = performance.now() + 550;
+          spawnExplosion();
+
+          if (game.hasBet && !game.cashedOut) game.stats.losses++;
+
+          game.history.unshift(game.crashPoint);
+          if (game.history.length > HISTORY_LIMIT) game.history.length = HISTORY_LIMIT;
+
+          if (multEl) {
+            multEl.textContent = `${game.crashPoint.toFixed(2)}x`;
+            multEl.style.transform = 'scale(1)';
+            multEl.className = 'text-4xl font-extrabold font-mono tabular-nums text-[#f6465d] drop-shadow-[0_0_20px_rgba(246,70,93,0.5)]';
+            lastMultClass = '';
+          }
+
+          renderHistory();
+          save();
+          syncStats();
+          syncStatus();
+          updateAction(true);
+
+          resetTimer = setTimeout(() => {
+            resetTimer = null;
+            startBettingPhase();
+          }, CRASH_PAUSE_MS);
+        }
+
+        // ==========================================
+        // CANVAS RENDERER
+        // ==========================================
+        let cw = 0;
+        let ch = 0;
+        let dpr = 1;
+
+        const stars = Array.from({ length: 70 }, () => ({
+          x: Math.random(),
+          y: Math.random(),
+          s: Math.random() * 1.8 + 0.4,
+          sp: Math.random() * 0.6 + 0.2,
+          a: Math.random() * 0.5 + 0.2,
+        }));
+
+        function resizeCanvas() {
+          const rect = canvas.getBoundingClientRect();
+          const ndpr = Math.min(window.devicePixelRatio || 1, 2);
+          const w = Math.round(rect.width);
+          const h = Math.round(rect.height);
+          if (!w || !h) return;
+          if (w !== cw || h !== ch || ndpr !== dpr) {
+            cw = w;
+            ch = h;
+            dpr = ndpr;
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          }
+        }
+
+        function rocketPos(tSeconds) {
+          const p = 1 - Math.exp(-tSeconds / 3.4);
+          return {
+            x: 24 + (cw - 64) * p,
+            y: ch - 34 - (ch - 78) * p,
+            p: p,
+          };
+        }
+
+        function drawRocket(tSeconds) {
+          const pos = rocketPos(tSeconds);
+          const ang = Math.atan2(-(ch - 78), cw - 64);
+
+          ctx.save();
+          ctx.translate(pos.x, pos.y);
+          ctx.rotate(ang);
+
+          // flame
+          const flame = 8 + Math.random() * 7;
+          ctx.fillStyle = 'rgba(243, 186, 47, 0.9)';
+          ctx.beginPath();
+          ctx.moveTo(-7, -4);
+          ctx.lineTo(-7 - flame, 0);
+          ctx.lineTo(-7, 4);
+          ctx.closePath();
+          ctx.fill();
+
+          // body
+          ctx.shadowColor = 'rgba(14, 203, 129, 0.85)';
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath();
+          ctx.moveTo(15, 0);
+          ctx.lineTo(-7, -7);
+          ctx.lineTo(-3, 0);
+          ctx.lineTo(-7, 7);
+          ctx.closePath();
+          ctx.fill();
+
+          // cockpit
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#0ecb81';
+          ctx.beginPath();
+          ctx.arc(4, 0, 2.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+          game.lastPos = pos;
+        }
+
+        function spawnExplosion() {
+          const pos = game.lastPos || { x: cw * 0.5, y: ch * 0.5 };
+          for (let i = 0; i < 48; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 1 + Math.random() * 6;
+            game.particles.push({
+              x: pos.x,
+              y: pos.y,
+              vx: Math.cos(a) * sp,
+              vy: Math.sin(a) * sp,
+              life: 1,
+              decay: 0.012 + Math.random() * 0.02,
+              r: 1 + Math.random() * 2.5,
+              color: Math.random() < 0.5 ? '#f6465d' : (Math.random() < 0.6 ? '#f3ba2f' : '#e2e8f0'),
+            });
+          }
+        }
+
+        function drawParticles() {
+          for (let i = game.particles.length - 1; i >= 0; i--) {
+            const p = game.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.985;
+            p.vy = p.vy * 0.985 + 0.08;
+            p.life -= p.decay;
+            if (p.life <= 0) {
+              game.particles.splice(i, 1);
+              continue;
+            }
+            ctx.globalAlpha = Math.max(0, p.life);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function draw(now) {
+          // Don't burn frames while the Games modal is closed
+          if (gamesModal && gamesModal.classList.contains('hidden-modal')) return;
+
+          resizeCanvas();
+          if (!cw || !ch) return;
+
+          ctx.save();
+
+          // screen shake on crash
+          if (now < game.shakeUntil) {
+            const k = (game.shakeUntil - now) / 550;
+            ctx.translate((Math.random() - 0.5) * 12 * k, (Math.random() - 0.5) * 12 * k);
+          }
+
+          // background
+          const bg = ctx.createLinearGradient(0, 0, 0, ch);
+          bg.addColorStop(0, '#070a12');
+          bg.addColorStop(1, '#0a1220');
+          ctx.fillStyle = bg;
+          ctx.fillRect(-24, -24, cw + 48, ch + 48);
+
+          // starfield
+          const speed = game.state === 'FLYING' ? 1.8 : 0.5;
+          for (const st of stars) {
+            st.y += 0.0015 * st.sp * speed;
+            if (st.y > 1) {
+              st.y = 0;
+              st.x = Math.random();
+            }
+            ctx.globalAlpha = st.a;
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(st.x * cw, st.y * ch, st.s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+          // cyber grid
+          ctx.strokeStyle = 'rgba(56, 148, 230, 0.12)';
+          ctx.lineWidth = 1;
+          const off = (now * 0.02) % 32;
+          for (let x = -off; x < cw + 32; x += 32) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, ch);
+            ctx.stroke();
+          }
+          for (let y = -off; y < ch + 32; y += 32) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(cw, y);
+            ctx.stroke();
+          }
+
+          // flight trail
+          if (game.trail.length > 1) {
+            for (let i = 1; i < game.trail.length; i++) {
+              const p0 = game.trail[i - 1];
+              const p1 = game.trail[i];
+              const t = i / game.trail.length;
+              ctx.strokeStyle = `rgba(14, 203, 129, ${(0.05 + t * 0.55).toFixed(3)})`;
+              ctx.lineWidth = 1 + t * 3;
+              ctx.beginPath();
+              ctx.moveTo(p0.x, p0.y);
+              ctx.lineTo(p1.x, p1.y);
+              ctx.stroke();
+            }
+          }
+
+          // rocket
+          if (game.state === 'FLYING' || game.state === 'IDLE') {
+            const t = game.state === 'FLYING' ? Math.max(0, (now - game.roundStart) / 1000) : 0;
+            drawRocket(t);
+          }
+
+          // explosion
+          drawParticles();
+
+          ctx.restore();
+        }
+
+        // ==========================================
+        // MAIN LOOP
+        // ==========================================
+        let lastChipsSeen = -1;
+
+        function loop(now) {
+          requestAnimationFrame(loop);
+
+          // Keep the displayed balance in sync with the shared CryptoFlip wallet
+          const chipsNow = getChips();
+          if (chipsNow !== lastChipsSeen) {
+            lastChipsSeen = chipsNow;
+            syncBalance();
+            if (game.state === 'IDLE' && !game.hasBet) updateAction(true);
+          }
+
+          if (game.state === 'FLYING') {
+            const t = Math.max(0, (now - game.roundStart) / 1000);
+            const m = Math.pow(GROWTH, t);
+            game.multiplier = m;
+
+            const pos = rocketPos(t);
+            game.trail.push({ x: pos.x, y: pos.y });
+            if (game.trail.length > 70) game.trail.shift();
+
+            // auto cash-out (only when the checkbox is enabled)
+            if (game.autoOn && game.auto >= 1.01 && game.hasBet && !game.cashedOut && m >= game.auto) {
+              cashOut();
+            }
+
+            if (m >= game.crashPoint) {
+              game.multiplier = game.crashPoint;
+              crash();
+            } else {
+              updateMultiplierText();
+              if (game.hasBet && !game.cashedOut) {
+                const cents = Math.floor(m * 100);
+                if (cents !== lastBtnCents) {
+                  lastBtnCents = cents;
+                  updateAction(false);
+                }
+              }
+            }
+          }
+
+          draw(now);
+        }
+
+        // ==========================================
+        // EVENTS
+        // ==========================================
+        if (betInput) {
+          betInput.addEventListener('input', () => {
+            const v = parseFloat(betInput.value);
+            if (!isNaN(v) && v > 0) game.bet = v;
+            updateAction(true);
+          });
+          betInput.addEventListener('blur', () => {
+            game.bet = Math.max(1, Math.min(Math.floor(game.bet) || 1, Math.max(1, getChips())));
+            betInput.value = String(game.bet);
+            updateAction(true);
+          });
+        }
+
+        if (autoInput) {
+          autoInput.addEventListener('input', () => {
+            const v = parseFloat(autoInput.value);
+            game.auto = isNaN(v) ? 0 : v;
+            save();
+          });
+          autoInput.addEventListener('blur', () => {
+            if (game.auto > 0 && game.auto < 1.01) game.auto = 1.01;
+            autoInput.value = game.auto.toFixed(2);
+            save();
+          });
+        }
+
+        if (autoToggle) {
+          autoToggle.addEventListener('change', () => {
+            game.autoOn = autoToggle.checked;
+            syncAutoControl();
+            save();
+            syncStatus();
+          });
+        }
+
+        document.querySelectorAll('[data-rc-quick]').forEach((b) => {
+          b.addEventListener('click', () => {
+            const k = b.getAttribute('data-rc-quick');
+            const cap = Math.max(1, Math.floor(getChips()));
+            let v = game.bet;
+            if (k === 'min') v = 1;
+            else if (k === 'half') v = Math.max(1, Math.floor(game.bet / 2));
+            else if (k === 'double') v = game.bet * 2;
+            else if (k === 'max') v = cap;
+            v = Math.max(1, Math.min(Math.floor(v), cap));
+            game.bet = v;
+            if (betInput) betInput.value = String(v);
+            updateAction(true);
+          });
+        });
+
+        if (actionBtn) {
+          actionBtn.addEventListener('click', () => {
+            if (game.state === 'FLYING') {
+              cashOut();
+            } else if (game.state === 'IDLE') {
+              placeBet();
+            }
+          });
+        }
+
+        // Give a full 5-second betting window whenever the Games modal is opened
+        const heroGamesBtn = $('hero-games-btn');
+        if (heroGamesBtn) {
+          heroGamesBtn.addEventListener('click', () => {
+            if (game.state === 'IDLE' && !game.hasBet) startBettingPhase();
+          });
+        }
+
+        // ==========================================
+        // BOOT
+        // ==========================================
+        function boot() {
+          load();
+          if (betInput) betInput.value = String(Math.max(1, Math.floor(game.bet)));
+          if (autoInput) autoInput.value = (game.auto >= 1.01 ? game.auto : 2).toFixed(2);
+          syncBalance();
+          syncStats();
+          syncAutoControl();
+          renderHistory();
+          startBettingPhase();
+          requestAnimationFrame(loop);
+
+          // After the initial UI is laid out, fetch the verified invite link from the
+          // backend so the invite modal can show the real link as soon as it exists.
+          bootstrapBackendInvite().catch((e) => console.warn('Backend invite bootstrap failed:', e));
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', boot);
+        } else {
+          boot();
+        }
+      })();
+    </script>
+  </body>
+</html>

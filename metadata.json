@@ -1,0 +1,6 @@
+{
+  "name": "CryptoFlip TMA - 10-Minute Prediction Game",
+  "description": "Multi-crypto 10-minute prediction game with virtual chips, live Binance pricing, PancakeSwap-style rounds, and Telegram native integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
