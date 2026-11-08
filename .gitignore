@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local secrets / scratch files
+*.dbpw.txt
+dbpw.txt
+supabase/dbpw.txt
+supabase/.temp/
