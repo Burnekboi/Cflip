@@ -896,6 +896,18 @@
 
             backendState = data;
 
+            // Invite rewards are credited to the server wallet. Apply only the
+            // delta since the last seen server balance so gameplay chips stored
+            // locally are never overwritten by the backend ledger.
+            if (data.wallet && typeof data.wallet.chips === 'number') {
+              const KEY = 'cf_tma_backend_chips';
+              const seenRaw = parseInt(localStorage.getItem(KEY) || '0', 10);
+              const seen = Number.isFinite(seenRaw) ? seenRaw : 0;
+              const delta = data.wallet.chips - seen;
+              if (delta > 0) Wallet.addChips(delta);
+              try { localStorage.setItem(KEY, String(data.wallet.chips)); } catch (e) {}
+            }
+
             if (data.invite && data.invite.link) {
               setInviteLink(data.invite.link);
             }
