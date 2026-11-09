@@ -284,13 +284,13 @@
           <span>10:00 (Settle)</span>
         </div>
 
-        <!-- LIVE 2D CANVAS PREDICTION ENGINE -->
+        <!-- LIVE TRADINGVIEW CHART -->
         <div class="relative w-full rounded-xl overflow-hidden border border-[#222b3d] bg-[#0c1017]">
           <!-- Real-Time Floating Price Overlay -->
-          <div class="absolute top-2.5 left-3 z-10 pointer-events-none">
+          <div class="absolute top-2.5 left-3 z-20 pointer-events-none">
             <div class="text-[10px] uppercase font-mono text-slate-400 flex items-center gap-1">
               <span id="current-crypto-symbol">BTC/USDT</span>
-              <span class="text-emerald-400 text-[9px]">● Live REST</span>
+              <span class="text-emerald-400 text-[9px]">● Live</span>
             </div>
             <div class="flex items-baseline gap-2">
               <span id="live-price-text" class="text-xl font-bold font-mono text-white tabular-nums tracking-tight">$88,450.00</span>
@@ -299,16 +299,17 @@
           </div>
 
           <!-- Lock Price Marker in Card Overlay -->
-          <div class="absolute top-2.5 right-3 z-10 text-right pointer-events-none">
+          <div class="absolute top-2.5 right-3 z-20 text-right pointer-events-none">
             <div class="text-[10px] uppercase font-mono text-slate-400">Lock Price (Open)</div>
             <div id="lock-price-text" class="text-xs font-bold font-mono text-slate-300 tabular-nums">Pending Lock</div>
           </div>
 
-          <!-- The HTML5 2D Canvas -->
-          <canvas id="predictionCanvas" class="w-full h-44 block"></canvas>
+          <!-- TradingView Embedded Chart -->
+          <div id="tradingview-chart" class="w-full h-44"></div>
+          <div id="tradingview-chart-fallback" class="hidden w-full h-44 flex items-center justify-center text-xs font-mono text-slate-500">Loading live chart…</div>
 
-          <!-- Status Banner inside canvas for Locked / Settling states -->
-          <div id="canvas-overlay-message" class="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300 opacity-0">
+          <!-- Status Banner inside chart for Locked / Settling states -->
+          <div id="canvas-overlay-message" class="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300 opacity-0 z-30">
             <span id="overlay-title" class="text-sm font-bold text-white tracking-wide">PREDICTION LOCKED</span>
             <span id="overlay-sub" class="text-xs text-slate-300 font-mono mt-1">Tracking asset price to settlement...</span>
           </div>
@@ -1875,8 +1876,82 @@
         };
 
         // ==========================================
-        // 6. HIGH-PERFORMANCE 2D CANVAS CHART
+        // 6. LIVE CHART (TradingView embed) + REAL PRICE POLLING
         // ==========================================
+        const LiveChart = {
+          _currentSymbol: null,
+          _tvReadyPromise: null,
+          _lastPriceFetch: 0,
+
+          ensureTvScript() {
+            if (window.TradingView && window.TradingView.widget) return Promise.resolve();
+            if (this._tvReadyPromise) return this._tvReadyPromise;
+            this._tvReadyPromise = new Promise((resolve) => {
+              const existing = document.querySelector('script[data-tv="1"]');
+              if (existing) {
+                existing.addEventListener('load', () => resolve(), { once: true });
+                if (window.TradingView) resolve();
+                return;
+              }
+              const s = document.createElement('script');
+              s.src = 'https://s3.tradingview.com/tv.js';
+              s.async = true;
+              s.dataset.tv = '1';
+              s.onload = () => resolve();
+              s.onerror = () => resolve(); // fall through gracefully
+              document.head.appendChild(s);
+            });
+            return this._tvReadyPromise;
+          },
+
+          symbolForAsset(asset) {
+            // Map Binance-style symbols (e.g. BTCUSDT, RONINUSD) to TradingView BINANCE symbols
+            const sym = (asset && asset.symbol) ? asset.symbol : 'BTCUSDT';
+            const tvSym = sym.replace(/USD$/, 'USDT');
+            return `BINANCE:${tvSym}`;
+          },
+
+          async render(asset) {
+            const container = document.getElementById('tradingview-chart');
+            if (!container) return;
+            const tvSymbol = this.symbolForAsset(asset || ASSETS[currentAssetIndex]);
+            if (this._currentSymbol === tvSymbol && container.querySelector('iframe')) return;
+            this._currentSymbol = tvSymbol;
+            container.innerHTML = '';
+
+            await this.ensureTvScript();
+            if (!(window.TradingView && window.TradingView.widget)) {
+              const fb = document.getElementById('tradingview-chart-fallback');
+              if (fb) { fb.classList.remove('hidden'); fb.textContent = 'Live chart unavailable'; }
+              return;
+            }
+            const fb = document.getElementById('tradingview-chart-fallback');
+            if (fb) fb.classList.add('hidden');
+
+            try {
+              new window.TradingView.widget({
+                autosize: true,
+                symbol: tvSymbol,
+                interval: '1',
+                timezone: 'Etc/UTC',
+                theme: 'dark',
+                style: '1',
+                locale: 'en',
+                hide_top_toolbar: true,
+                hide_legend: true,
+                allow_symbol_change: false,
+                save_image: false,
+                backgroundColor: 'rgba(12, 16, 23, 1)',
+                gridColor: 'rgba(255, 255, 255, 0.04)',
+                container_id: 'tradingview-chart',
+              });
+            } catch (e) {
+              console.warn('TradingView widget init failed:', e);
+            }
+          },
+        };
+
+        // Legacy canvas chart stub (replaced by TradingView embed)
         const CanvasChart = {
           canvas: null,
           ctx: null,
@@ -1886,7 +1961,7 @@
 
           init() {
             this.canvas = document.getElementById('predictionCanvas');
-            if (!this.canvas) return;
+            if (!this.canvas) return; // TradingView embed active
             this.ctx = this.canvas.getContext('2d');
             this.resize();
             window.addEventListener('resize', () => this.resize());
@@ -2094,6 +2169,7 @@
 
             // Seed initial chart points
             this.seedHistory();
+            LiveChart.render(ASSETS[currentAssetIndex]);
 
             // Load saved settled round history if available
             try {
@@ -2258,6 +2334,7 @@
             RoundState.phase = 'BETTING';
             RoundState.closePrice = null;
             RoundState.userBet = null;
+            this._lastRealPriceFetch = 0; // force fresh API price on new round
 
             // The lock price is fixed at round OPEN — not after betting closes.
             // The previous settlement price carries over as the new lock when the
@@ -2325,33 +2402,38 @@
           },
 
           simulatePriceTick() {
-            // High fidelity micro-fluctuations simulating active orderbook
+            // Live price tick: poll real API every ~10s; settlement fetch at round end
+            // provides the definitive 10-minute result check.
             const asset = ASSETS[currentAssetIndex];
-            const volatility = asset.basePrice * 0.0003;
-            const delta = (Math.random() - 0.495) * volatility;
-            RoundState.currentPrice = Math.max(0.0001, RoundState.currentPrice + delta);
+            const now = Date.now();
+            const doFetch = !this._lastRealPriceFetch || (now - this._lastRealPriceFetch) >= 10000;
 
-            const priceEl = document.getElementById('live-price-text');
-            if (priceEl) priceEl.textContent = `$${RoundState.currentPrice.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
+            const applyPrice = (price) => {
+              if (!price || isNaN(price) || price <= 0) return;
+              RoundState.currentPrice = price;
+              const priceEl = document.getElementById('live-price-text');
+              if (priceEl) priceEl.textContent = `$${price.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
 
-            // Delta
-            const ref = RoundState.lockPrice || RoundState.priceHistory[0]?.price || RoundState.currentPrice;
-            const deltaPercent = ((RoundState.currentPrice - ref) / ref) * 100;
-            const deltaEl = document.getElementById('price-delta-badge');
-            if (deltaEl) {
-              const sign = deltaPercent >= 0 ? '+' : '';
-              deltaEl.textContent = `${sign}${deltaPercent.toFixed(2)}%`;
-              deltaEl.className = `text-xs font-mono font-semibold tabular-nums ${deltaPercent >= 0 ? 'text-emerald-400' : 'text-[#f6465d]'}`;
-            }
+              const ref = RoundState.lockPrice || RoundState.priceHistory[0]?.price || price;
+              const deltaPercent = ref ? ((price - ref) / ref) * 100 : 0;
+              const deltaEl = document.getElementById('price-delta-badge');
+              if (deltaEl) {
+                const sign = deltaPercent >= 0 ? '+' : '';
+                deltaEl.textContent = `${sign}${deltaPercent.toFixed(2)}%`;
+                deltaEl.className = `text-xs font-mono font-semibold tabular-nums ${deltaPercent >= 0 ? 'text-emerald-400' : 'text-[#f6465d]'}`;
+              }
+              this.syncUserBetBanner(deltaPercent);
 
-            this.syncUserBetBanner(deltaPercent);
+              RoundState.priceHistory.push({ time: RoundState.priceHistory.length, price });
+              if (RoundState.priceHistory.length > 50) RoundState.priceHistory.shift();
+            };
 
-            RoundState.priceHistory.push({
-              time: RoundState.priceHistory.length,
-              price: RoundState.currentPrice
-            });
-            if (RoundState.priceHistory.length > 50) {
-              RoundState.priceHistory.shift();
+            if (doFetch) {
+              this._lastRealPriceFetch = now;
+              PriceService.fetchPrice(asset.symbol).then(applyPrice).catch(() => {});
+            } else if (RoundState.currentPrice) {
+              // Refresh UI from last known real price (no simulated drift)
+              applyPrice(RoundState.currentPrice);
             }
           },
 
@@ -2468,6 +2550,7 @@
               this.renderCryptoTabs();
               await this.updateCurrentPrice();
               this.seedHistory();
+              LiveChart.render(ASSETS[currentAssetIndex]);
               this.startRoundLoop();
             }, 3000);
           },
@@ -2740,10 +2823,12 @@
                   TelegramController.haptic('selection');
                   AudioFX.click();
                   this.renderCryptoTabs();
+                  this._lastRealPriceFetch = 0;
                   await this.updateCurrentPrice();
                   // New market = new lock price taken at switch time
                   RoundState.lockPrice = RoundState.currentPrice;
                   this.seedHistory();
+                  LiveChart.render(ASSETS[currentAssetIndex]);
                   this.updateRoundUI();
                   const activeBtn = document.querySelector(`.crypto-tab-btn[data-index="${currentAssetIndex}"]`);
                   if (activeBtn) {
