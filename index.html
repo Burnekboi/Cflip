@@ -10,6 +10,10 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <!-- App icon -->
+    <link rel="icon" type="image/jpeg" href="./logo-256.jpg" />
+    <link rel="apple-touch-icon" href="./logo-256.jpg" />
+
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -153,9 +157,13 @@
     <header class="sticky top-0 z-40 bg-[#0b0e14]/90 backdrop-blur-md border-b border-[#1b2230] px-4 py-3 flex items-center justify-between gap-4">
       <!-- Zone 1: Wordmark & Live Ticker Status -->
       <div class="flex items-center gap-2 shrink-0">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0ecb81] to-[#f3ba2f] flex items-center justify-center font-bold text-black text-sm shadow-md shadow-[#0ecb81]/20">
-          CF
-        </div>
+        <img
+          src="./logo-256.jpg"
+          alt="CryptoFlip logo"
+          width="32"
+          height="32"
+          class="w-8 h-8 rounded-xl object-cover shadow-md shadow-[#0ecb81]/20 ring-1 ring-white/10"
+        />
         <div>
           <div class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
             CryptoFlip <span class="text-[10px] uppercase font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold">TMA</span>
