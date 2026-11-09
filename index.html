@@ -529,30 +529,25 @@
     </main>
 
     <!-- FIXED BOTTOM TAB BAR (Thumb ergonomics) -->
-    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-[#0b0e14]/95 backdrop-blur-md border-t border-[#1b2230] py-2 px-2 flex items-center justify-around max-w-md mx-auto">
-      <button class="nav-tab active flex flex-col items-center text-emerald-400" data-view="game">
-        <span class="text-lg">📈</span>
-        <span class="text-[10px] font-semibold mt-0.5 tracking-tight">Prediction</span>
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-[#0b0e14]/95 backdrop-blur-md border-t border-[#1b2230] px-1 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center max-w-md mx-auto">
+      <button class="nav-tab active flex-1 flex items-center justify-center py-2 text-emerald-400" data-view="game" aria-label="Prediction" title="Prediction">
+        <span class="text-[26px] leading-none">📈</span>
       </button>
 
-      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="history">
-        <span class="text-lg">📜</span>
-        <span class="text-[10px] font-medium mt-0.5 tracking-tight">History</span>
+      <button class="nav-tab flex-1 flex items-center justify-center py-2 text-slate-400 hover:text-slate-200 transition-colors" data-view="history" aria-label="History" title="History">
+        <span class="text-[26px] leading-none">📜</span>
       </button>
 
-      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="leaderboard">
-        <span class="text-lg">🏆</span>
-        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Ranks</span>
+      <button class="nav-tab flex-1 flex items-center justify-center py-2 text-slate-400 hover:text-slate-200 transition-colors" data-view="leaderboard" aria-label="Ranks" title="Ranks">
+        <span class="text-[26px] leading-none">🏆</span>
       </button>
 
-      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="missions">
-        <span class="text-lg">🎯</span>
-        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Mission</span>
+      <button class="nav-tab flex-1 flex items-center justify-center py-2 text-slate-400 hover:text-slate-200 transition-colors" data-view="missions" aria-label="Mission" title="Mission">
+        <span class="text-[26px] leading-none">🎯</span>
       </button>
 
-      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="announcements">
-        <span class="text-lg">📢</span>
-        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Announcements</span>
+      <button class="nav-tab flex-1 flex items-center justify-center py-2 text-slate-400 hover:text-slate-200 transition-colors" data-view="announcements" aria-label="Announcements" title="Announcements">
+        <span class="text-[26px] leading-none">📢</span>
       </button>
     </nav>
 
