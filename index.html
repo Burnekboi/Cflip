@@ -3839,10 +3839,6 @@
           renderHistory();
           startBettingPhase();
           requestAnimationFrame(loop);
-
-          // After the initial UI is laid out, fetch the verified invite link from the
-          // backend so the invite modal can show the real link as soon as it exists.
-          bootstrapBackendInvite().catch((e) => console.warn('Backend invite bootstrap failed:', e));
         }
 
         if (document.readyState === 'loading') {
