@@ -194,10 +194,16 @@
         </div>
       </div>
 
-      <!-- Center: Mock Online Players -->
-      <div id="online-indicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#121a26]/80 border border-[#1f2a3d] shrink-0">
-        <span class="online-orb" aria-hidden="true"></span>
-        <span class="text-[10px] font-mono text-slate-300 whitespace-nowrap">Online <span id="online-count" class="text-emerald-400 font-semibold">139</span></span>
+      <!-- Center: Online Players + Join TG -->
+      <div class="flex items-center gap-2 shrink-0">
+        <div id="online-indicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#121a26]/80 border border-[#1f2a3d] shrink-0">
+          <span class="online-orb" aria-hidden="true"></span>
+          <span class="text-[10px] font-mono text-slate-300 whitespace-nowrap">Online <span id="online-count" class="text-emerald-400 font-semibold">139</span></span>
+        </div>
+        <button id="join-tg-btn" class="btn-press flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#229ED9]/15 border border-[#229ED9]/35 text-[#229ED9] hover:bg-[#229ED9]/25 transition-colors shrink-0" title="Join our Telegram channel" aria-label="Join Telegram channel">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.993 15.674l-.396 5.568c.567 0 .813-.244 1.107-.536l2.658-2.54 5.51 4.035c1.01.557 1.725.264 1.998-.936L24.93 3.77c.321-1.497-.541-2.083-1.526-1.717L2.12 10.36c-1.458.567-1.436 1.38-.248 1.748l5.45 1.701L19.986 5.86c.596-.394 1.138-.176.692.218"/></svg>
+          <span class="text-[10px] font-semibold whitespace-nowrap">Join TG</span>
+        </button>
       </div>
 
       <!-- Right Zone: Audio FX Toggle -->
@@ -4493,10 +4499,26 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
 })();
 </script>
   
-<script type="module" id="mock-online-drift">
+<script type="module" id="online-presence">
 (async function(){
   var el=document.getElementById('online-count'); if(!el) return;
-  function setCount(n){ if(typeof n==='number' && isFinite(n) && n>=0) el.textContent=String(n); }
+  var MIN=139, MAX=500;
+  var mockBase = Math.floor(MIN + Math.random() * (MAX - MIN + 1));
+  var realCount = 0;
+  function clamp(n){ return Math.max(MIN, Math.min(MAX, n)); }
+  function render(){ el.textContent = String(clamp(mockBase) + Math.max(0, realCount)); }
+  function driftMock(){
+    // infrequent, slow drift; keeps within 139-500
+    var delta = Math.floor((Math.random() * 7) - 3); // -3..+3
+    if (delta === 0) delta = Math.random() < 0.5 ? -1 : 1;
+    mockBase = clamp(mockBase + delta);
+    render();
+  }
+  render();
+  // ~15 min base drift, plus rare small nudges so it isn't perfectly static
+  setInterval(driftMock, 15 * 60 * 1000);
+  setInterval(function(){ if(Math.random() < 0.25) driftMock(); }, 4 * 60 * 1000);
+
   try{
     var cfgRes = await fetch('/api/public-config', {cache:'no-store'});
     if(!cfgRes.ok) throw new Error('config');
@@ -4511,7 +4533,8 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
       var state = channel.presenceState();
       var total = 0;
       for (var k in state){ if(Object.prototype.hasOwnProperty.call(state,k)) total += (state[k] ? state[k].length : 1); }
-      setCount(total);
+      realCount = total;
+      render(); // immediate update when real players enter/leave
     });
     channel.subscribe(async function(status){
       if(status === 'SUBSCRIBED'){
@@ -4520,9 +4543,25 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
     });
     window.addEventListener('beforeunload', function(){ try{ supabase.removeChannel(channel); }catch(e){} });
   }catch(e){
-    // fallback: keep the indicator but show a dash so it's clear it's unavailable
-    try{ el.textContent = '—'; }catch(_){}
+    // presence unavailable: keep showing mock base (real players not added)
+    realCount = 0; render();
   }
+})();
+</script>
+<script>
+(function(){
+  var btn = document.getElementById('join-tg-btn');
+  if(!btn) return;
+  btn.addEventListener('click', function(){
+    var url = 'https://t.me/pinayslick';
+    try {
+      if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === 'function') {
+        window.Telegram.WebApp.openTelegramLink(url);
+        return;
+      }
+    } catch(e){}
+    window.open(url, '_blank', 'noopener');
+  });
 })();
 </script>
 </body>
