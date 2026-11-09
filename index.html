@@ -298,10 +298,13 @@
             </div>
           </div>
 
-          <!-- Lock Price Marker in Card Overlay -->
+          <!-- Lock Price Marker in Card Overlay (the 10-min lock amount players bet UP/DOWN against) -->
           <div class="absolute top-2.5 right-3 z-20 text-right pointer-events-none">
-            <div class="text-[10px] uppercase font-mono text-slate-400">Lock Price (Open)</div>
-            <div id="lock-price-text" class="text-xs font-bold font-mono text-slate-300 tabular-nums">Pending Lock</div>
+            <div class="rounded-lg border border-amber-400/30 bg-[#0c1017]/90 px-2 py-1 shadow-sm">
+              <div class="text-[9px] uppercase font-mono text-amber-300/90 tracking-wide">🔒 Lock Price · Bet UP/DOWN</div>
+              <div id="lock-price-text" class="text-sm font-extrabold font-mono text-amber-200 tabular-nums">Pending Lock</div>
+              <div class="text-[9px] font-mono text-slate-500">Set every 10 min</div>
+            </div>
           </div>
 
           <!-- TradingView Embedded Chart -->
@@ -2291,6 +2294,18 @@
             }
           },
 
+          updateLockPriceDisplay() {
+            const el = document.getElementById('lock-price-text');
+            if (!el) return;
+            const asset = ASSETS[currentAssetIndex];
+            const lock = RoundState.lockPrice;
+            if (lock === null || lock === undefined || isNaN(lock)) {
+              el.textContent = 'Pending Lock';
+              return;
+            }
+            el.textContent = `$${lock.toLocaleString(undefined, { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals })}`;
+          },
+
           syncUserBetBanner(deltaPercent) {
             const banner = document.getElementById('user-bet-status-banner');
             if (!banner) return;
@@ -2344,8 +2359,10 @@
             // The lock price is fixed at round OPEN — not after betting closes.
             // The previous settlement price carries over as the new lock when the
             // same market continues; otherwise the live price at open is the lock.
+            // Every 10 minutes the settled (last) price becomes the lock amount for bets.
             const carriesOver = RoundState.prevCloseSymbol === asset.symbol && RoundState.prevClosePrice !== null;
             RoundState.lockPrice = carriesOver ? RoundState.prevClosePrice : RoundState.currentPrice;
+            this.updateLockPriceDisplay();
 
             // Generate realistic dynamic pool sizes
             const baseUp = Math.floor(8000 + Math.random() * 12000);
@@ -2832,6 +2849,7 @@
                   await this.updateCurrentPrice();
                   // New market = new lock price taken at switch time
                   RoundState.lockPrice = RoundState.currentPrice;
+                  this.updateLockPriceDisplay();
                   this.seedHistory();
                   LiveChart.render(ASSETS[currentAssetIndex]);
                   this.updateRoundUI();
