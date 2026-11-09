@@ -4493,23 +4493,36 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
 })();
 </script>
   
-<script id="mock-online-drift">
-(function(){
+<script type="module" id="mock-online-drift">
+(async function(){
   var el=document.getElementById('online-count'); if(!el) return;
-  function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
-  function clamp(v){return Math.max(139,Math.min(500,v));}
-  var n=rand(139,500); el.textContent=String(n);
-  // Base refresh every 15 minutes
-  setInterval(function(){ n=clamp(n + rand(-12,12)); el.textContent=String(n); }, 15*60*1000);
-  // Occasional player enter/leave events (not constant) so it changes only when "players enter"
-  function eventTick(){
-    var enter = Math.random() < 0.7; // bias toward entering
-    var delta = enter ? rand(1,4) : -rand(1,3);
-    n = clamp(n + delta);
-    el.textContent=String(n);
-    setTimeout(eventTick, rand(3*60*1000, 12*60*1000)); // every 3–12 min, sporadic
+  function setCount(n){ if(typeof n==='number' && isFinite(n) && n>=0) el.textContent=String(n); }
+  try{
+    var cfgRes = await fetch('/api/public-config', {cache:'no-store'});
+    if(!cfgRes.ok) throw new Error('config');
+    var cfg = await cfgRes.json();
+    if(!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) throw new Error('config');
+    var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+    var createClient = mod.createClient;
+    var supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession:false, autoRefreshToken:false } });
+    var sessionId = (Math.random().toString(36).slice(2) + Date.now().toString(36));
+    var channel = supabase.channel('cryptoflip-online', { config: { presence: { key: sessionId } } });
+    channel.on('presence', { event: 'sync' }, function(){
+      var state = channel.presenceState();
+      var total = 0;
+      for (var k in state){ if(Object.prototype.hasOwnProperty.call(state,k)) total += (state[k] ? state[k].length : 1); }
+      setCount(total);
+    });
+    channel.subscribe(async function(status){
+      if(status === 'SUBSCRIBED'){
+        try { await channel.track({ online_at: new Date().toISOString() }); } catch(e){}
+      }
+    });
+    window.addEventListener('beforeunload', function(){ try{ supabase.removeChannel(channel); }catch(e){} });
+  }catch(e){
+    // fallback: keep the indicator but show a dash so it's clear it's unavailable
+    try{ el.textContent = '—'; }catch(_){}
   }
-  setTimeout(eventTick, rand(2*60*1000, 8*60*1000));
 })();
 </script>
 </body>

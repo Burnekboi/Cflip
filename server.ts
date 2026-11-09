@@ -119,6 +119,14 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Public client config (anon key is safe to expose; service role is never returned).
+app.get('/api/public-config', (_req, res) => {
+  if (!supabaseConfig) {
+    return res.status(503).json({ ok: false, error: 'Not configured' });
+  }
+  return res.json({ ok: true, supabaseUrl: supabaseConfig.url, supabaseAnonKey: supabaseConfig.anonKey });
+});
+
 /**
  * Current user + invite state.
  *
