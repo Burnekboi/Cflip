@@ -149,7 +149,19 @@
         visibility: hidden;
         pointer-events: none;
       }
-    </style>
+    
+/* CryptoAce (cascading slot) */
+.ca-gold-shimmer{background:linear-gradient(115deg,rgba(255,215,0,.15) 0%,rgba(255,255,255,.55) 35%,rgba(255,215,0,.85) 50%,rgba(255,255,255,.55) 65%,rgba(255,215,0,.15) 100%);background-size:200% 100%;animation:caGold 3s infinite linear}
+@keyframes caGold{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes caReelIn{0%{transform:translateY(-110%);opacity:.1}68%{transform:translateY(8px);opacity:1}86%{transform:translateY(-3px)}100%{transform:translateY(0);opacity:1}}
+@keyframes caCascade{0%{transform:translateY(-120%);opacity:.1}70%{transform:translateY(6px);opacity:1}86%{transform:translateY(-2px)}100%{transform:translateY(0);opacity:1}}
+@keyframes caWin{0%,100%{transform:scale(1.03);filter:brightness(1.2)}50%{transform:scale(1.06);filter:brightness(1.35)}}
+@keyframes caElim{0%{transform:scale(1);opacity:1}38%{transform:scale(1.08);filter:brightness(1.7);opacity:.9}100%{transform:scale(.3) translateY(16px);opacity:0}}
+.ca-reel-in{animation:caReelIn .5s cubic-bezier(.22,1.25,.45,1) forwards}
+.ca-cascade{animation:caCascade .52s cubic-bezier(.22,1.25,.45,1) forwards}
+.ca-win{animation:caWin .7s infinite ease-in-out}
+.ca-elim{animation:caElim .3s ease-in forwards}
+</style>
   </head>
   <body class="flex flex-col min-h-screen text-slate-100 antialiased selection:bg-[#0ecb81]/30">
 
@@ -634,6 +646,17 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
             <span class="text-emerald-400 text-sm font-bold">Play ›</span>
           </button>
 
+          <button id="open-cryptoace-btn" class="btn-press w-full text-left rounded-2xl border border-[#243044] bg-[#0b0f18] hover:border-amber-500/40 p-3 flex items-center justify-between gap-3 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xl">🃏</div>
+              <div>
+                <div class="text-sm font-bold text-white leading-none">CryptoAce</div>
+                <div class="text-[10px] font-mono text-slate-500 mt-1">1024 ways · cascading slot</div>
+              </div>
+            </div>
+            <span class="text-amber-400 text-sm font-bold">Play ›</span>
+          </button>
+
           <button id="close-games-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
             Close
           </button>
@@ -711,6 +734,40 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
             </div>
           </div>
         </div>
+        </div>
+
+        <!-- CRYPTOACE VIEW -->
+        <div id="games-cryptoace-view" class="hidden flex-col gap-2.5">
+          <button id="back-to-games-ca-btn" class="btn-press self-start flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-2 py-1.5 rounded-lg bg-[#1e273a] border border-[#27344c]">
+            <span>←</span><span>Back to Games</span>
+          </button>
+          <div class="rounded-2xl border border-[#243044] bg-[#0b0f18] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-[#1b2333] bg-[#101623]">
+              <div class="flex items-center gap-2"><span class="text-base">🃏</span><div><div class="text-xs font-bold text-white leading-none">CryptoAce</div><div class="text-[9px] font-mono text-slate-500 mt-0.5">1024 ways · cascades · free spins</div></div></div>
+              <div class="text-right"><div class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Chips</div><div class="text-sm font-bold font-mono text-emerald-400 tabular-nums" id="ca-balance">0</div></div>
+            </div>
+            <div id="ca-mult-bar" class="flex items-center justify-center gap-1.5 px-2 py-2 border-b border-[#1b2333] bg-[#0d121c] text-[10px] font-mono text-slate-400"></div>
+            <div class="p-2 bg-[#070a12]">
+              <div id="ca-grid" class="grid grid-cols-5 gap-1.5" style="min-height:180px"></div>
+              <div id="ca-message" class="text-center text-[10px] font-mono text-slate-400 mt-1.5 min-h-[16px]">Ready to spin</div>
+            </div>
+            <div class="p-2.5 flex flex-col gap-2 bg-[#0d121c] border-t border-[#1b2333]">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Bet</span>
+                  <button id="ca-bet-minus" class="btn-press w-7 h-7 rounded-lg bg-[#141b27] border border-[#232e42] text-slate-200 font-bold">−</button>
+                  <span id="ca-bet" class="text-xs font-mono font-bold text-white min-w-[56px] text-center tabular-nums">100</span>
+                  <button id="ca-bet-plus" class="btn-press w-7 h-7 rounded-lg bg-[#141b27] border border-[#232e42] text-slate-200 font-bold">+</button>
+                </div>
+                <div class="text-right"><div class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Win</div><div id="ca-win" class="text-sm font-bold font-mono text-amber-300 tabular-nums">0</div></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="ca-turbo" class="btn-press px-3 py-2.5 rounded-xl bg-[#141b27] border border-[#232e42] text-slate-300 text-[11px] font-bold">Turbo</button>
+                <button id="ca-spin" class="btn-press flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-extrabold text-sm shadow-lg shadow-amber-500/20 transition-all disabled:opacity-40 disabled:pointer-events-none">Spin</button>
+              </div>
+              <div id="ca-fs-status" class="hidden text-[10px] font-mono text-fuchsia-300 text-center">Free Spins: <strong id="ca-fs-left">0</strong> remaining</div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -3285,7 +3342,9 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
               openRocketCrashBtn.addEventListener('click', () => {
                 const list = document.getElementById('games-list-view');
                 const rc = document.getElementById('games-rocketcrash-view');
+                const ca = document.getElementById('games-cryptoace-view');
                 if (list) list.classList.add('hidden');
+                if (ca) { ca.classList.add('hidden'); ca.classList.remove('flex'); }
                 if (rc) { rc.classList.remove('hidden'); rc.classList.add('flex'); }
                 TelegramController.haptic('light');
                 setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }, 60);
@@ -3297,6 +3356,29 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
                 const list = document.getElementById('games-list-view');
                 const rc = document.getElementById('games-rocketcrash-view');
                 if (rc) { rc.classList.add('hidden'); rc.classList.remove('flex'); }
+                if (list) list.classList.remove('hidden');
+                TelegramController.haptic('selection');
+              });
+            }
+            const openCryptoAceBtn = document.getElementById('open-cryptoace-btn');
+            if (openCryptoAceBtn) {
+              openCryptoAceBtn.addEventListener('click', () => {
+                const list = document.getElementById('games-list-view');
+                const rc = document.getElementById('games-rocketcrash-view');
+                const ca = document.getElementById('games-cryptoace-view');
+                if (list) list.classList.add('hidden');
+                if (rc) { rc.classList.add('hidden'); rc.classList.remove('flex'); }
+                if (ca) { ca.classList.remove('hidden'); ca.classList.add('flex'); }
+                TelegramController.haptic('light');
+                try { window.CryptoAceGame && window.CryptoAceGame.onEnter && window.CryptoAceGame.onEnter(); } catch (e) {}
+              });
+            }
+            const backToGamesCaBtn = document.getElementById('back-to-games-ca-btn');
+            if (backToGamesCaBtn) {
+              backToGamesCaBtn.addEventListener('click', () => {
+                const list = document.getElementById('games-list-view');
+                const ca = document.getElementById('games-cryptoace-view');
+                if (ca) { ca.classList.add('hidden'); ca.classList.remove('flex'); }
                 if (list) list.classList.remove('hidden');
                 TelegramController.haptic('selection');
               });
@@ -3423,7 +3505,9 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
               // Always show the games dashboard first
               const list = document.getElementById('games-list-view');
               const rc = document.getElementById('games-rocketcrash-view');
+              const ca = document.getElementById('games-cryptoace-view');
               if (rc) { rc.classList.add('hidden'); rc.classList.remove('flex'); }
+              if (ca) { ca.classList.add('hidden'); ca.classList.remove('flex'); }
               if (list) list.classList.remove('hidden');
               modal.classList.remove('hidden-modal');
               TelegramController.haptic('light');
@@ -4207,5 +4291,46 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
         }
       })();
     </script>
+  <script>
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const TMA={getChips(){try{return (window.CFWallet&&window.CFWallet.getChips)?Math.max(0,Math.floor(window.CFWallet.getChips())):0;}catch(e){return 0;}},deduct(a){try{return !!(window.CFWallet&&window.CFWallet.deductChips&&window.CFWallet.deductChips(a));}catch(e){return false;}},add(a){try{if(window.CFWallet&&window.CFWallet.addChips)window.CFWallet.addChips(a);}catch(e){}}};
+  const fmt=(n)=>Math.floor(n).toLocaleString();
+  function bufHex(buf){return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");}
+  function hexBytes(hex){const h=hex.trim().replace(/^0x/i,"");const b=new Uint8Array(h.length/2);for(let i=0;i<b.length;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+  function randHex(n){const b=new Uint8Array(n);crypto.getRandomValues(b);return bufHex(b.buffer);}
+  function randClient(){const c="abcdef0123456789";let r="";const v=new Uint8Array(16);crypto.getRandomValues(v);for(let i=0;i<16;i++)r+=c[v[i]%c.length];return r;}
+  async function sha256(msg){return bufHex(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(msg)));}
+  async function hmac(keyHex,msg){const k=await crypto.subtle.importKey("raw",hexBytes(keyHex),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return bufHex(await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(msg)));}
+  class PRNG{constructor(s,c,n){this.s=s;this.c=c;this.n=n;this.step=0;this.bytes=new Uint8Array(0);this.off=0;}async init(){const h=await hmac(this.s,this.c+":"+this.n+":"+this.step);this.bytes=hexBytes(h);this.off=0;return h;}async nextFloat(){if(this.off+4>this.bytes.length){this.step++;this.bytes=hexBytes(await hmac(this.s,this.c+":"+this.n+":"+this.step));this.off=0;}const b0=this.bytes[this.off++],b1=this.bytes[this.off++],b2=this.bytes[this.off++],b3=this.bytes[this.off++];return (((b0<<24)|(b1<<16)|(b2<<8)|b3)>>>0)/4294967296;}async nextInt(min,max){return min+Math.floor((await this.nextFloat())*(max-min+1));}async nextBool(p){return (await this.nextFloat())<p;}}
+  const SYM={BTC:{id:"BTC",label:"BTC",high:1,pay:{3:.5,4:1.5,5:2.5},bd:"border-amber-500/50",fg:"#F7931A"},ETH:{id:"ETH",label:"ETH",high:1,pay:{3:.4,4:1.2,5:2.0},bd:"border-indigo-500/50",fg:"#627EEA"},SOL:{id:"SOL",label:"SOL",high:1,pay:{3:.3,4:.9,5:1.5},bd:"border-teal-400/50",fg:"#14F195"},BNB:{id:"BNB",label:"BNB",high:1,pay:{3:.2,4:.6,5:1.0},bd:"border-yellow-500/50",fg:"#F3BA2F"},ADA:{id:"ADA",label:"ADA",high:0,pay:{3:.1,4:.3,5:.5},bd:"border-blue-600/40",fg:"#60A5FA"},XRP:{id:"XRP",label:"XRP",high:0,pay:{3:.1,4:.3,5:.5},bd:"border-cyan-600/40",fg:"#22D3EE"},DOGE:{id:"DOGE",label:"DOGE",high:0,pay:{3:.05,4:.15,5:.25},bd:"border-amber-600/40",fg:"#FACC15"},AVAX:{id:"AVAX",label:"AVAX",high:0,pay:{3:.05,4:.15,5:.25},bd:"border-red-600/40",fg:"#F87171"},SCATTER:{id:"SCATTER",label:"FREE",high:0,pay:{3:0,4:0,5:0},bd:"border-fuchsia-400",fg:"#E879F9"},LITTLE_JOKER:{id:"LITTLE_JOKER",label:"WILD",high:0,pay:{3:0,4:0,5:0},bd:"border-emerald-400",fg:"#34D399"},BIG_JOKER:{id:"BIG_JOKER",label:"SUPER",high:0,pay:{3:0,4:0,5:0},bd:"border-pink-400",fg:"#F472B6"}};
+  const ICON={BTC:"₿",ETH:"Ξ",SOL:"◎",BNB:"⬡",ADA:"₳",XRP:"✕",DOGE:"Ð",AVAX:"▲",SCATTER:"👑",LITTLE_JOKER:"🃏",BIG_JOKER:"⚡"};
+  const WEIGHTS=[["BTC",8],["ETH",10],["SOL",12],["BNB",14],["ADA",18],["XRP",20],["DOGE",22],["AVAX",24],["SCATTER",6]];const TOTAL_W=WEIGHTS.reduce((a,x)=>a+x[1],0);
+  const BASE_M=[1,2,3,5],FREE_M=[2,4,6,10],BETS=[10,25,50,100,250,500,1000,2500,5000];
+  function cloneGrid(g){return g.map(r=>r.map(c=>Object.assign({},c)));}
+  async function rollCard(prng,reel,row,step){const roll=await prng.nextInt(1,TOTAL_W);let cum=0,id="DOGE";for(const [sid,w] of WEIGHTS){cum+=w;if(roll<=cum){id=sid;break;}}const def=SYM[id];let golden=false;if(def.high&&reel>=1&&reel<=3)golden=await prng.nextBool(0.25);return {uid:"c_"+step+"_"+reel+"_"+row+"_"+Math.random().toString(36).slice(2,6),symbolId:id,isGolden:golden,isWild:false,isScatter:id==="SCATTER",isWinning:false};}
+  function evalWays(grid,bet){const pays=["BTC","ETH","SOL","BNB","ADA","XRP","DOGE","AVAX"];const wins=[];for(const sid of pays){const per=[];for(let r=0;r<5;r++){const m=[];for(let row=0;row<4;row++){const it=grid[r][row];if(it.symbolId===sid||it.symbolId==="LITTLE_JOKER"||it.symbolId==="BIG_JOKER")m.push({reel:r,row});}per.push(m);}let consec=0;for(let r=0;r<5;r++){if(per[r].length)consec++;else break;}if(consec>=3){let ways=1;const pos=[];for(let r=0;r<consec;r++){ways*=per[r].length;pos.push(...per[r]);}const base=consec===5?SYM[sid].pay[5]:consec===4?SYM[sid].pay[4]:SYM[sid].pay[3];wins.push({symbolId:sid,count:consec,ways,baseMultiplier:base,payout:base*ways*bet,winningPositions:pos});}}return wins;}
+  async function generateSpin(serverSeed,clientSeed,nonce,bet,isFree){const prng=new PRNG(serverSeed,clientSeed,nonce);await prng.init();const scat=new Set();const initial=[];for(let r=0;r<5;r++){const col=[];for(let row=0;row<4;row++){const c=await rollCard(prng,r,row,"i");if(c.isScatter)scat.add(c.uid);col.push(c);}initial.push(col);}const cascades=[];let grid=cloneGrid(initial),idx=0,total=0;const ladder=isFree?FREE_M:BASE_M;while(idx<15){const wins=evalWays(grid,bet);if(!wins.length)break;const mult=ladder[Math.min(idx,ladder.length-1)];const winMap=new Set();let stepBase=0;wins.forEach(w=>{stepBase+=w.payout;w.winningPositions.forEach(p=>winMap.add(p.reel+","+p.row));});const stepPayout=stepBase*mult;total+=stepPayout;const gridBefore=cloneGrid(grid);for(let r=0;r<5;r++)for(let row=0;row<4;row++)if(winMap.has(r+","+row))gridBefore[r][row].isWinning=true;const goldT=[];const next=[];for(let r=0;r<5;r++){const remain=[];for(let row=0;row<4;row++){const it=grid[r][row];const isW=winMap.has(r+","+row);if(isW){if(it.isGolden){const big=await prng.nextBool(0.22);const jt=big?"BIG_JOKER":"LITTLE_JOKER";goldT.push({reel:r,row,jokerType:jt});remain.push({uid:"j_"+idx+"_"+r+"_"+row,symbolId:jt,isGolden:false,isWild:true,isScatter:false,isWinning:false});}}else remain.push(Object.assign({},it,{isWinning:false}));}const need=4-remain.length;const news=[];for(let i=0;i<need;i++){const nc=await rollCard(prng,r,i,"c"+idx);nc.isNew=true;if(nc.isScatter)scat.add(nc.uid);news.push(nc);}next.push(news.concat(remain));}for(const g of goldT){if(g.jokerType==="BIG_JOKER"){const n=await prng.nextInt(1,3);const cand=[];for(let r=1;r<=3;r++)for(let row=0;row<4;row++){const sl=next[r][row];if(!sl.isWild&&sl.symbolId!=="SCATTER")cand.push({reel:r,row});}for(let i=0;i<n&&cand.length;i++){const pi=await prng.nextInt(0,cand.length-1);const pk=cand.splice(pi,1)[0];next[pk.reel][pk.row]={uid:"bj_"+idx+"_"+pk.reel+"_"+pk.row,symbolId:"LITTLE_JOKER",isGolden:false,isWild:true,isScatter:false,isWinning:false};}}}next.flat().forEach(c=>{if(c.isScatter)scat.add(c.uid);});cascades.push({stepIndex:idx,gridBefore,stepPayout,multiplier:mult,gridAfter:cloneGrid(next)});grid=cloneGrid(next);idx++;}return {initialGrid:initial,cascades,totalWin:Math.round(total*100)/100,isFreeSpinTriggered:scat.size>=3,scatterCount:scat.size};}
+  const G={betIdx:3,spinning:false,turbo:false,isFree:false,fsLeft:0,serverSeed:randHex(32),clientSeed:randClient(),nonce:0};
+  function setMsg(t,cls){const el=$("ca-message");if(el){el.textContent=t;el.className="text-center text-[10px] font-mono mt-1.5 min-h-[16px] "+(cls||"text-slate-400");}}
+  function syncBalance(){const el=$("ca-balance");if(el)el.textContent=fmt(TMA.getChips());}
+  function betVal(){return BETS[G.betIdx];}
+  function renderMult(active,isFree){const bar=$("ca-mult-bar");if(!bar)return;const lad=isFree?FREE_M:BASE_M;bar.innerHTML=lad.map((m,i)=>{const on=i===Math.min(active,lad.length-1);const cls=on?(isFree?"bg-fuchsia-600 text-white border-fuchsia-400 scale-110":"bg-amber-500 text-black border-amber-300 scale-110"):"bg-[#141b27] text-slate-400 border-[#232e42]";return '<div class="px-2.5 py-1 rounded-lg border text-[11px] font-black '+cls+'">x'+m+"</div>";}).join("");}
+  function cardHTML(card,anim){const def=SYM[card.symbolId]||SYM.DOGE;const ic=ICON[card.symbolId]||"?";let bd=def.bd,extra="bg-gradient-to-b from-slate-900 to-slate-950";if(card.isGolden){bd="border-amber-400 ring-1 ring-amber-400/60";extra="ca-gold-shimmer";}else if(card.symbolId==="BIG_JOKER")bd="border-pink-500 ring-1 ring-pink-500/60";else if(card.symbolId==="LITTLE_JOKER")bd="border-emerald-400 ring-1 ring-emerald-400/60";else if(card.symbolId==="SCATTER")bd="border-fuchsia-400 ring-1 ring-fuchsia-400/60";let ac="";if(card.isEliminating)ac=" ca-elim";else if(card.isWinning)ac=" ca-win";else if(anim==="cascade"&&card.isNew)ac=" ca-cascade";const badge=card.isGolden?'<div class="absolute top-0.5 right-1 text-[7px] font-black text-amber-300">★</div>':"";return '<div class="relative h-[54px] rounded-xl border '+bd+" "+extra+" flex flex-col items-center justify-center select-none overflow-hidden"+ac+'">'+badge+'<div class="text-base leading-none" style="color:'+def.fg+'">'+ic+'</div><div class="text-[8px] font-black" style="color:'+def.fg+'">'+def.label+"</div></div>";}
+  function renderGridCols(grid,anim){const root=$("ca-grid");if(!root)return;root.innerHTML="";for(let r=0;r<5;r++){const col=document.createElement("div");col.className="flex flex-col gap-1.5";if(anim==="in"){col.className+=" ca-reel-in";col.style.animationDelay=(r*55)+"ms";}for(let row=0;row<4;row++){const tmp=document.createElement("div");tmp.innerHTML=cardHTML(grid[r][row],anim==="cascade"?"cascade":"");col.appendChild(tmp.firstChild);}root.appendChild(col);}}
+  function setSpinning(v){G.spinning=v;const spin=$("ca-spin");if(spin){spin.disabled=v||(!G.isFree&&TMA.getChips()<betVal());spin.textContent=G.isFree?(v?"Spinning…":"Free Spin"):(v?"Spinning…":"Spin");}["ca-bet-minus","ca-bet-plus"].forEach(id=>{const b=$(id);if(b)b.disabled=v||G.isFree;});}
+  function syncBet(){const el=$("ca-bet");if(el)el.textContent=fmt(betVal());syncBalance();const spin=$("ca-spin");if(spin&&!G.spinning)spin.disabled=!G.isFree&&TMA.getChips()<betVal();}
+  function syncFS(){const st=$("ca-fs-status"),lf=$("ca-fs-left");if(st)st.classList.toggle("hidden",!G.isFree);if(lf)lf.textContent=String(G.fsLeft);}
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  async function doSpin(){if(G.spinning)return;if(!G.isFree){if(TMA.getChips()<betVal()){setMsg("Not enough chips","text-red-400");return;}if(!TMA.deduct(betVal())){setMsg("Could not place bet","text-red-400");return;}}syncBalance();const bet=betVal(),isFree=G.isFree;setSpinning(true);const winEl=$("ca-win");if(winEl)winEl.textContent="0";setMsg(isFree?"Free spin…":"Spinning…","text-slate-300");const res=await generateSpin(G.serverSeed,G.clientSeed,G.nonce,bet,isFree);G.nonce++;renderGridCols(res.initialGrid,"in");await sleep(G.turbo?240:580);let acc=0;const ci=G.turbo?300:700;for(let i=0;i<res.cascades.length;i++){const c=res.cascades[i];renderMult(i,isFree);renderGridCols(c.gridBefore,"");await sleep(ci*0.5);acc+=c.stepPayout;if(winEl)winEl.textContent=fmt(Math.round(acc));setMsg("Cascade "+(i+1)+" · x"+c.multiplier+" · +"+fmt(Math.round(c.stepPayout)),"text-amber-300");renderGridCols(c.gridAfter,"cascade");await sleep(ci*0.65);}renderMult(res.cascades.length?res.cascades.length-1:0,isFree);if(res.totalWin>0){TMA.add(Math.round(res.totalWin));if(winEl)winEl.textContent=fmt(Math.round(res.totalWin));setMsg("WIN +"+fmt(Math.round(res.totalWin))+" chips"+(res.totalWin>=bet*15?" · BIG WIN!":""),"text-emerald-400");}else setMsg(isFree?"No win":"No win this spin","text-slate-400");syncBalance();if(res.isFreeSpinTriggered||res.scatterCount>=3){if(!G.isFree){G.isFree=true;G.fsLeft=10;setMsg("FREE SPINS! +10","text-fuchsia-300");}else{G.fsLeft+=5;setMsg("RETRIGGER! +5 free spins","text-fuchsia-300");}syncFS();}if(G.isFree){G.fsLeft--;if(G.fsLeft<=0){G.isFree=false;G.fsLeft=0;setMsg("Free spins complete","text-fuchsia-300");}syncFS();}setSpinning(false);renderMult(0,G.isFree);if(G.isFree&&G.fsLeft>0){await sleep(G.turbo?380:850);doSpin();}}
+  function init(){const syms=["BTC","ETH","SOL","BNB","ADA","XRP","DOGE","AVAX"];const g=[];for(let r=0;r<5;r++){const col=[];for(let row=0;row<4;row++)col.push({uid:"p_"+r+"_"+row,symbolId:syms[(r+row)%8],isGolden:(r>=1&&r<=3&&row===1),isWild:false,isScatter:false});g.push(col);}renderGridCols(g,"");renderMult(0,false);syncBet();syncFS();}
+  $("ca-bet-minus")&&$("ca-bet-minus").addEventListener("click",()=>{if(G.spinning||G.isFree)return;G.betIdx=Math.max(0,G.betIdx-1);syncBet();});
+  $("ca-bet-plus")&&$("ca-bet-plus").addEventListener("click",()=>{if(G.spinning||G.isFree)return;G.betIdx=Math.min(BETS.length-1,G.betIdx+1);syncBet();});
+  $("ca-turbo")&&$("ca-turbo").addEventListener("click",()=>{G.turbo=!G.turbo;$("ca-turbo").classList.toggle("text-amber-300",G.turbo);$("ca-turbo").classList.toggle("border-amber-500/50",G.turbo);});
+  $("ca-spin")&&$("ca-spin").addEventListener("click",doSpin);
+  window.CryptoAceGame={onEnter(){syncBalance();syncBet();syncFS();}};
+  init();
+})();
+</script>
   </body>
 </html>
