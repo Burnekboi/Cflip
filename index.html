@@ -1256,9 +1256,10 @@
         let currentAssetIndex = 0;
 
         // ==========================================
-        // 5-MARKET ROTATION (switches every 10-minute round)
+        // 5-MARKET ROTATION (refreshes every 24 hours)
         // ==========================================
         const ROTATION_SIZE = 5;
+        const ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
         let rotationPool = [];      // indices of the 5 markets currently offered
         let rotationQueue = [];     // shuffled queue so every coin eventually shows up
 
@@ -1271,12 +1272,38 @@
           return arr;
         }
 
-        function rotateMarketPool() {
+        function loadRotationState() {
+          try {
+            const raw = localStorage.getItem('cf_rotation_state');
+            if (!raw) return null;
+            const s = JSON.parse(raw);
+            if (!s || !Array.isArray(s.pool) || s.pool.length !== ROTATION_SIZE) return null;
+            return s;
+          } catch (e) { return null; }
+        }
+
+        function saveRotationState(pool, rotatedAt) {
+          try {
+            localStorage.setItem('cf_rotation_state', JSON.stringify({ pool, rotatedAt }));
+          } catch (e) {}
+        }
+
+        function rotateMarketPool(force) {
+          const saved = loadRotationState();
+          const now = Date.now();
+          const freshEnough = saved && (now - (saved.rotatedAt || 0)) < ROTATION_INTERVAL_MS;
+          if (!force && freshEnough) {
+            rotationPool = saved.pool.slice();
+            if (!isInRotation(currentAssetIndex)) currentAssetIndex = rotationPool[0];
+            prefetchPoolPrices();
+            return rotationPool;
+          }
           if (rotationQueue.length < ROTATION_SIZE) {
             rotationQueue = shuffleIndices(ASSETS.length);
           }
           rotationPool = rotationQueue.splice(0, ROTATION_SIZE);
-          currentAssetIndex = rotationPool[0];
+          if (!isInRotation(currentAssetIndex)) currentAssetIndex = rotationPool[0];
+          saveRotationState(rotationPool, now);
           prefetchPoolPrices();
           return rotationPool;
         }
@@ -2193,8 +2220,18 @@
             // Render Round History List immediately
             this.renderHistoryList();
 
-            // Start Game Loop
-            this.startRoundLoop();
+            // Restore an ongoing bet/round if the app was reopened mid-round
+            const restored = this.tryRestoreActiveRound();
+            if (restored) {
+              this.renderCryptoTabs();
+              this.updateLockPriceDisplay();
+              LiveChart.render(ASSETS[currentAssetIndex]);
+              await this.updateCurrentPrice();
+              this.startRoundLoop({ resume: true });
+            } else {
+              // Start Game Loop
+              this.startRoundLoop();
+            }
 
             // Bind Event Listeners
             this.bindEvents();
@@ -2345,32 +2382,75 @@
             }
           },
 
-          startRoundLoop() {
+          startRoundLoop(opts = {}) {
             if (RoundState.roundTimer) clearInterval(RoundState.roundTimer);
 
             const modeConfig = GAME_MODES[currentMode];
             const asset = ASSETS[currentAssetIndex];
-            RoundState.secondsElapsed = 0;
-            RoundState.phase = 'BETTING';
-            RoundState.closePrice = null;
-            RoundState.userBet = null;
-            this._lastRealPriceFetch = 0; // force fresh API price on new round
+            const resume = !!(opts && opts.resume && RoundState.roundStartedAt && RoundState.lockPrice !== null && RoundState.lockPrice !== undefined);
 
-            // The lock price is fixed at round OPEN — not after betting closes.
-            // The previous settlement price carries over as the new lock when the
-            // same market continues; otherwise the live price at open is the lock.
-            // Every 10 minutes the settled (last) price becomes the lock amount for bets.
-            const carriesOver = RoundState.prevCloseSymbol === asset.symbol && RoundState.prevClosePrice !== null;
-            RoundState.lockPrice = carriesOver ? RoundState.prevClosePrice : RoundState.currentPrice;
+            if (resume) {
+              const elapsedFromClock = Math.floor((Date.now() - RoundState.roundStartedAt) / 1000);
+              RoundState.secondsElapsed = Math.max(0, Math.min(elapsedFromClock, modeConfig.totalSeconds - 1));
+              RoundState.closePrice = null;
+              // keep userBet, lockPrice, roundId, roundStartedAt as restored
+            } else {
+              RoundState.roundStartedAt = Date.now();
+              RoundState.secondsElapsed = 0;
+              RoundState.phase = 'BETTING';
+              RoundState.closePrice = null;
+              RoundState.userBet = null;
+              this.clearActiveBetState();
+
+              // The lock price is fixed at round OPEN — not after betting closes.
+              // The previous settlement price carries over as the new lock when the
+              // same market continues; otherwise the live price at open is the lock.
+              // Every 10 minutes the settled (last) price becomes the lock amount for bets.
+              const carriesOver = RoundState.prevCloseSymbol === asset.symbol && RoundState.prevClosePrice !== null;
+              RoundState.lockPrice = carriesOver ? RoundState.prevClosePrice : RoundState.currentPrice;
+            }
+
+            this._lastRealPriceFetch = 0; // force fresh API price
             this.updateLockPriceDisplay();
 
-            // Generate realistic dynamic pool sizes
+            // Generate realistic dynamic pool sizes (regenerate is fine)
             const baseUp = Math.floor(8000 + Math.random() * 12000);
             const baseDown = Math.floor(8000 + Math.random() * 12000);
             this.recalculatePool(baseUp, baseDown);
 
+            // Apply phase/UI for current state (important when resuming mid-round)
+            const applyPhaseUI = () => {
+              const elapsed = RoundState.secondsElapsed;
+              if (elapsed < modeConfig.bettingSeconds) {
+                RoundState.phase = 'BETTING';
+                const remaining = modeConfig.bettingSeconds - elapsed;
+                this.updateTimerDisplay(remaining, 'Closes in:');
+                const btnUp = document.getElementById('btn-enter-up');
+                const btnDown = document.getElementById('btn-enter-down');
+                if (btnUp) btnUp.disabled = !!RoundState.userBet;
+                if (btnDown) btnDown.disabled = !!RoundState.userBet;
+              } else {
+                RoundState.phase = 'LOCKED';
+                const remaining = Math.max(0, modeConfig.totalSeconds - elapsed);
+                this.updateTimerDisplay(remaining, 'Settles in:');
+                const btnUp = document.getElementById('btn-enter-up');
+                const btnDown = document.getElementById('btn-enter-down');
+                if (btnUp) btnUp.disabled = true;
+                if (btnDown) btnDown.disabled = true;
+                const badge = document.getElementById('round-phase-badge');
+                if (badge) {
+                  badge.textContent = '🔒 Betting Closed · Tracking';
+                  badge.className = '-ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                }
+              }
+              if (RoundState.userBet) this.syncUserBetBanner(0);
+              this.updateProgressBar(elapsed, modeConfig.totalSeconds);
+            };
+
             this.updateRoundUI();
+            applyPhaseUI();
             Wallet.syncUI();
+            this.saveRoundContext();
 
             // Auto-scroll the tab strip so the active crypto is centered in view
             setTimeout(() => {
@@ -2541,6 +2621,7 @@
               localStorage.setItem('cf_tma_history', JSON.stringify(RoundState.historyList.slice(0, 30)));
             } catch (e) {}
             this.renderHistoryList();
+            this.clearActiveBetState();
 
             // Trigger Celebration or Outcome Feedback
             if (RoundState.userBet) {
@@ -2565,7 +2646,7 @@
               }, 1200);
             }
 
-            // Increment Round ID and switch to a fresh set of 5 markets (every 10 minutes)
+            // Increment Round ID; refresh the 5-market pool only when the 24h rotation is due
             RoundState.roundId++;
             rotateMarketPool();
             setTimeout(async () => {
@@ -2754,6 +2835,90 @@
             if (banner) banner.classList.add('hidden');
           },
 
+          saveActiveBetState() {
+            try {
+              if (!RoundState.userBet) { localStorage.removeItem('cf_active_bet'); return; }
+              const asset = ASSETS[currentAssetIndex];
+              localStorage.setItem('cf_active_bet', JSON.stringify({
+                roundId: RoundState.roundId,
+                assetIndex: currentAssetIndex,
+                symbol: asset.symbol,
+                pair: asset.pair,
+                assetName: asset.name,
+                lockPrice: RoundState.lockPrice,
+                direction: RoundState.userBet.direction,
+                amount: RoundState.userBet.amount,
+                roundStartedAt: RoundState.roundStartedAt || Date.now(),
+              }));
+            } catch (e) {}
+          },
+
+          clearActiveBetState() {
+            try { localStorage.removeItem('cf_active_bet'); } catch (e) {}
+          },
+
+          saveRoundContext() {
+            try {
+              const asset = ASSETS[currentAssetIndex];
+              localStorage.setItem('cf_round_ctx', JSON.stringify({
+                roundId: RoundState.roundId,
+                assetIndex: currentAssetIndex,
+                symbol: asset.symbol,
+                lockPrice: RoundState.lockPrice,
+                roundStartedAt: RoundState.roundStartedAt || Date.now(),
+              }));
+            } catch (e) {}
+          },
+
+          clearRoundContext() {
+            try { localStorage.removeItem('cf_round_ctx'); } catch (e) {}
+          },
+
+          tryRestoreActiveRound() {
+            try {
+              const raw = localStorage.getItem('cf_active_bet');
+              if (!raw) return false;
+              const bet = JSON.parse(raw);
+              if (!bet || !bet.roundStartedAt || !bet.symbol) { this.clearActiveBetState(); return false; }
+              const modeConfig = GAME_MODES[currentMode];
+              const elapsedMs = Date.now() - bet.roundStartedAt;
+              if (elapsedMs >= modeConfig.totalSeconds * 1000) {
+                // Round expired while app was closed: refund the staked chips so they aren't lost
+                if (bet.amount > 0) {
+                  Wallet.addChips(bet.amount);
+                  try { Wallet.save(); } catch (e) {}
+                }
+                this.clearActiveBetState();
+                return false;
+              }
+              // Restore if the market is in the current 24h pool
+              const idx = (typeof bet.assetIndex === 'number' && ASSETS[bet.assetIndex] && ASSETS[bet.assetIndex].symbol === bet.symbol)
+                ? bet.assetIndex
+                : ASSETS.findIndex(a => a.symbol === bet.symbol);
+              if (idx < 0 || !isInRotation(idx)) {
+                // Can't safely restore to this pool: refund staked chips
+                if (bet.amount > 0) { Wallet.addChips(bet.amount); try { Wallet.save(); } catch (e) {} }
+                this.clearActiveBetState();
+                return false;
+              }
+              currentAssetIndex = idx;
+              RoundState.roundId = bet.roundId || RoundState.roundId;
+              RoundState.lockPrice = (bet.lockPrice !== undefined && bet.lockPrice !== null) ? bet.lockPrice : RoundState.lockPrice;
+              RoundState.roundStartedAt = bet.roundStartedAt;
+              RoundState.userBet = {
+                direction: bet.direction,
+                amount: bet.amount,
+                assetName: bet.assetName || ASSETS[idx].name,
+                pair: bet.pair || ASSETS[idx].pair,
+                timestamp: bet.roundStartedAt,
+              };
+              return true;
+            } catch (e) {
+              this.clearActiveBetState();
+              return false;
+            }
+          },
+
           placeBet(direction) {
             if (RoundState.phase !== 'BETTING') {
               TelegramController.haptic('error');
@@ -2787,6 +2952,7 @@
               timestamp: Date.now()
             };
             Wallet.syncUI();
+            this.saveActiveBetState();
 
             // Recalculate dynamic pool
             if (direction === 'UP') {
