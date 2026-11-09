@@ -772,25 +772,15 @@
         <!-- Invite link box -->
         <div class="flex flex-col gap-2">
           <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Your invite link</label>
-          <div class="flex gap-2">
-            <input
+          <div class="flex gap-2">              <input
               id="invite-link-input"
               type="text"
               readonly
               class="flex-1 bg-[#0b0e14] border border-[#232e42] rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 break-all select-all"
               placeholder="Invite link will appear here"
             />
-            <button id="copy-invite-link-btn" class="btn-press shrink-0 py-2.5 px-3 rounded-xl bg-[#182030] border border-[#26334a] text-slate-200 hover:text-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Copy invite link">
-              <span id="copy-invite-label">Copy</span>
-            </button>
           </div>
-          <div id="invite-copy-toast" class="hidden text-[10px] font-mono text-emerald-400 font-semibold">Link copied</div>
         </div>
-
-        <!-- Share to Telegram -->
-        <button id="share-invite-to-tg-btn" class="btn-press w-full py-3 rounded-xl bg-gradient-to-r from-[#2aabee] to-[#2599d6] text-white font-bold text-sm shadow-lg shadow-[#2aabee]/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none">
-          <span>🚀</span> Share on Telegram
-        </button>
 
         <!-- Invite reward progress -->
         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
@@ -848,7 +838,6 @@
           } catch (e) {
             console.warn('Could not persist invite link:', e);
           }
-          InviteModal.render();
         }
 
         // Latest verified server state (wallet balance + invite status).
@@ -986,11 +975,6 @@
         // ==========================================
         const InviteModal = {
           modalEl: () => document.getElementById('invite-modal'),
-          inputEl: () => document.getElementById('invite-link-input'),
-          copyBtnEl: () => document.getElementById('copy-invite-link-btn'),
-          copyLabelEl: () => document.getElementById('copy-invite-label'),
-          shareBtnEl: () => document.getElementById('share-invite-to-tg-btn'),
-          toastEl: () => document.getElementById('invite-copy-toast'),
           pendingNoteEl: () => document.getElementById('invite-pending-note'),
           setupNoteEl: () => document.getElementById('invite-setup-note'),
 
@@ -1004,15 +988,11 @@
             if (this.isReady()) {
               input.value = INVITE_LINK;
               input.placeholder = '';
-              this.copyBtnEl()?.removeAttribute('disabled');
-              this.shareBtnEl()?.removeAttribute('disabled');
               this.pendingNoteEl()?.classList.add('hidden');
               this.setupNoteEl()?.classList.add('hidden');
             } else {
               input.value = '';
               input.placeholder = 'Invite link will appear here';
-              this.copyBtnEl()?.setAttribute('disabled', '');
-              this.shareBtnEl()?.setAttribute('disabled', '');
               this.pendingNoteEl()?.classList.remove('hidden');
               this.setupNoteEl()?.classList.remove('hidden');
             }
@@ -1022,10 +1002,8 @@
             const modal = this.modalEl();
             if (!modal) return;
             this.render();
-            // Keep invite reward progress in sync every time the modal opens.
             try { Wallet.syncRewardsUI && Wallet.syncRewardsUI(); } catch (e) {}
             modal.classList.remove('hidden-modal');
-            TG?.openLink?.();
           },
 
           close() {
@@ -1034,64 +1012,7 @@
             modal.classList.add('hidden-modal');
           },
 
-          copyLink() {
-            if (!this.isReady()) return;
-            const input = this.inputEl();
-            if (!input) return;
-            const text = input.value;
-            if (!text) return;
 
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(text).then(
-                () => this.showCopied(),
-                () => this.fallbackCopy(text)
-              );
-            } else {
-              this.fallbackCopy(text);
-            }
-            TelegramController.haptic('success');
-          },
-
-          fallbackCopy(text) {
-            const input = this.inputEl();
-            if (!input) return;
-            input.select();
-            input.setSelectionRange(0, 99999);
-            try {
-              document.execCommand('copy');
-              this.showCopied();
-            } catch (e) {
-              console.warn('Copy invite link failed:', e);
-            }
-          },
-
-          showCopied() {
-            const label = this.copyLabelEl();
-            const toast = this.toastEl();
-            if (label) label.textContent = 'Copied';
-            if (toast) {
-              toast.classList.remove('hidden');
-              setTimeout(() => toast.classList.add('hidden'), 1400);
-            }
-            setTimeout(() => {
-              if (label) label.textContent = 'Copy';
-            }, 1400);
-          },
-
-          shareToTelegram() {
-            if (!this.isReady()) return;
-            const link = INVITE_LINK;
-            const appTitle = 'CryptoFlip TMA';
-            const shareText = `${appTitle} invite link: ${link}`;
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`;
-
-            if (TG?.openTelegramLink) {
-              TG.openTelegramLink(shareUrl);
-            } else {
-              window.open(shareUrl, '_blank', 'noopener');
-            }
-            TelegramController.haptic('light');
-          },
         };
 
         function openInviteModal() {
@@ -2918,22 +2839,6 @@
                 if (e.key === 'Escape' && !inviteModalEl.classList.contains('hidden-modal')) {
                   InviteModal.close();
                 }
-              });
-            }
-
-            const copyInviteBtn = document.getElementById('copy-invite-link-btn');
-            if (copyInviteBtn) {
-              copyInviteBtn.addEventListener('click', () => {
-                TelegramController.haptic('light');
-                InviteModal.copyLink();
-              });
-            }
-
-            const shareInviteBtn = document.getElementById('share-invite-to-tg-btn');
-            if (shareInviteBtn) {
-              shareInviteBtn.addEventListener('click', () => {
-                TelegramController.haptic('light');
-                InviteModal.shareToTelegram();
               });
             }
 
