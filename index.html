@@ -794,9 +794,9 @@
 
         <!-- Invite reward progress -->
         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
-          <span>Invite rewards: <strong id="invite-reward-status" class="text-[#f3ba2f] font-bold">0 / 3 claimed</strong></span>
+          <span>Invite rewards: <strong id="invite-reward-status" class="text-[#f3ba2f] font-bold">0 / 3 joined</strong></span>
           <button id="claim-invite-reward-btn" class="btn-press shrink-0 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold text-[10px] shadow-md shadow-amber-500/20 disabled:opacity-40 disabled:pointer-events-none">
-            Claim +1,000
+            Credited on join
           </button>
         </div>
 
@@ -1555,14 +1555,24 @@
             // Invite reward progress UI (shown inside the invite modal)
             const inviteStatusEl = document.getElementById('invite-reward-status');
             const inviteClaimBtn = document.getElementById('claim-invite-reward-btn');
+            // The server is the source of truth: it credits the inviter when a
+            // friend joins through their link, so there is nothing to claim here.
+            const serverClaimed = typeof this.rewards.invitesClaimedBackend === 'number'
+              ? this.rewards.invitesClaimedBackend
+              : null;
+            const claimedCount = serverClaimed !== null
+              ? serverClaimed
+              : (this.rewards.invitesClaimed || 0);
+            const invitesLeft = Math.max(0, MAX_INVITE_REWARDS - claimedCount);
+
             if (inviteStatusEl) {
-              const claimed = this.rewards.invitesClaimed || 0;
-              const remaining = this.invitesRemaining();
-              inviteStatusEl.textContent = `${claimed} / ${MAX_INVITE_REWARDS} claimed`;
+              inviteStatusEl.textContent = `${claimedCount} / ${MAX_INVITE_REWARDS} joined`;
             }
             if (inviteClaimBtn) {
-              const remaining = this.invitesRemaining();
-              if (remaining <= 0) {
+              if (serverClaimed !== null) {
+                inviteClaimBtn.disabled = true;
+                inviteClaimBtn.textContent = invitesLeft > 0 ? 'Credited on join' : 'All invites used ✓';
+              } else if (invitesLeft <= 0) {
                 inviteClaimBtn.disabled = true;
                 inviteClaimBtn.textContent = 'All claimed ✓';
               } else if (!this.isInviteReady()) {
@@ -2930,6 +2940,11 @@
             const inviteClaimBtn = document.getElementById('claim-invite-reward-btn');
             if (inviteClaimBtn) {
               inviteClaimBtn.addEventListener('click', () => {
+                if (typeof Wallet.rewards.invitesClaimedBackend === 'number') {
+                  TelegramController.haptic('error');
+                  alert(`Invite chips are credited automatically when a friend opens your link. ${Wallet.rewards.invitesClaimedBackend} of ${MAX_INVITE_REWARDS} joined so far.`);
+                  return;
+                }
                 if (!Wallet.isInviteReady()) {
                   TelegramController.haptic('error');
                   alert('Invite rewards require a live Mini App invite link. Set one with setInviteLink(...) when the Mini App is deployed.');
@@ -3133,6 +3148,11 @@
           TelegramController.init();
           AudioFX.init();
           Wallet.load();
+
+          // Verified invites: register this user, fetch their real invite link and
+          // apply any chips the server has already credited for joins.
+          bootstrapBackendInvite();
+
           CanvasChart.init();
           GameEngine.init();
 
