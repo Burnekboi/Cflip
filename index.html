@@ -524,9 +524,9 @@
         <span class="text-[10px] font-medium mt-0.5 tracking-tight">Mission</span>
       </button>
 
-      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="faucet">
-        <span class="text-lg">🎁</span>
-        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Daily Chips</span>
+      <button class="nav-tab flex flex-col items-center text-slate-400 hover:text-slate-200" data-view="announcements">
+        <span class="text-lg">📢</span>
+        <span class="text-[10px] font-medium mt-0.5 tracking-tight">Announcements</span>
       </button>
     </nav>
 
@@ -569,6 +569,43 @@
           <span>Powered by</span>
           <span class="text-slate-400 font-semibold">Adsgram Network</span>
         </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ANNOUNCEMENTS -->
+    <div id="announcements-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-sm p-5 flex flex-col gap-3 relative shadow-2xl max-h-[88vh] overflow-y-auto no-scrollbar">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📢</span>
+            <h3 class="text-base font-bold text-white">Announcement</h3>
+          </div>
+          <button id="close-announcements-modal" class="text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
+        </div>
+
+        <div class="text-[13px] leading-relaxed text-slate-200 whitespace-pre-line">🚨 BIG ANNOUNCEMENT: YOUR CHIPS ARE GETTING REAL VALUE! 🚨
+
+Hey Players! 🎰✨
+
+Every game you play and every CHIP you collect in CryptoFlip is paving the way for something massive.
+
+We are officially announcing that in-game Chips will be convertible into our upcoming official Crypto Token! 🪙💥
+
+Here is what you need to know:
+
+💰 Keep Stacking: The more Chips you accumulate now, the bigger your allocation when conversion opens.
+
+🚀 Token Listing: Our token will be launched and traded on the crypto market soon.
+
+🔄 Conversion Details: Official conversion rates, snapshot dates, and claim guides will be shared in upcoming updates.
+
+Don’t stop playing—every single Chip counts toward your future crypto bag!
+
+Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
+
+        <button id="close-announcements-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300 mt-1">
+          Close
+        </button>
       </div>
     </div>
 
@@ -3259,8 +3296,8 @@
               tab.addEventListener('click', () => {
                 const view = tab.getAttribute('data-view');
                 TelegramController.haptic('selection');
-                if (view === 'faucet') {
-                  this.openFaucetModal(true);
+                if (view === 'announcements') {
+                  document.getElementById('announcements-modal')?.classList.remove('hidden-modal');
                 } else if (view === 'missions') {
                   this.openMissionsModal(true);
                 } else if (view === 'leaderboard') {
@@ -3286,6 +3323,13 @@
                 document.getElementById('ranks-modal')?.classList.add('hidden-modal');
               });
             }
+
+            // Close Announcements Modal
+            const closeAnnouncementsModal = document.getElementById('close-announcements-modal');
+            const closeAnnouncementsBtn = document.getElementById('close-announcements-btn');
+            const hideAnnouncements = () => document.getElementById('announcements-modal')?.classList.add('hidden-modal');
+            if (closeAnnouncementsModal) closeAnnouncementsModal.addEventListener('click', hideAnnouncements);
+            if (closeAnnouncementsBtn) closeAnnouncementsBtn.addEventListener('click', hideAnnouncements);
 
             // Missions Modal: open/close + claim buttons
             const closeMissionsModal = document.getElementById('close-missions-modal');
