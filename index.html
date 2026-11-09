@@ -194,16 +194,10 @@
         </div>
       </div>
 
-      <!-- Center: Online Players + Join TG -->
-      <div class="flex items-center gap-2 shrink-0">
-        <div id="online-indicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#121a26]/80 border border-[#1f2a3d] shrink-0">
-          <span class="online-orb" aria-hidden="true"></span>
-          <span class="text-[10px] font-mono text-slate-300 whitespace-nowrap">Online <span id="online-count" class="text-emerald-400 font-semibold">139</span></span>
-        </div>
-        <button id="join-tg-btn" class="btn-press flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#229ED9]/15 border border-[#229ED9]/35 text-[#229ED9] hover:bg-[#229ED9]/25 transition-colors shrink-0" title="Join our Telegram channel" aria-label="Join Telegram channel">
-          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.993 15.674l-.396 5.568c.567 0 .813-.244 1.107-.536l2.658-2.54 5.51 4.035c1.01.557 1.725.264 1.998-.936L24.93 3.77c.321-1.497-.541-2.083-1.526-1.717L2.12 10.36c-1.458.567-1.436 1.38-.248 1.748l5.45 1.701L19.986 5.86c.596-.394 1.138-.176.692.218"/></svg>
-          <span class="text-[10px] font-semibold whitespace-nowrap">Join TG</span>
-        </button>
+      <!-- Center: Online Players -->
+      <div id="online-indicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#121a26]/80 border border-[#1f2a3d] shrink-0">
+        <span class="online-orb" aria-hidden="true"></span>
+        <span class="text-[10px] font-mono text-slate-300 whitespace-nowrap">Online <span id="online-count" class="text-emerald-400 font-semibold">139</span></span>
       </div>
 
       <!-- Right Zone: Audio FX Toggle -->
@@ -246,11 +240,11 @@
             <span>🎁</span>
             <span>Daily</span>
           </button>
-          <button id="tg-share-btn" class="btn-press py-2 rounded-xl bg-[#182335] border border-[#27384f] hover:border-[#3894e6] text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors" title="Share Win or Invite Friends">
+          <button id="tg-share-btn" class="btn-press py-2 rounded-xl bg-[#182335] border border-[#27384f] hover:border-[#3894e6] text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors" title="Join channel & invite friends">
             <svg class="w-3.5 h-3.5 text-[#3894e6]" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
             </svg>
-            <span>Invite</span>
+            <span>Join&amp;Inv</span>
           </button>
         </div>
 
@@ -925,12 +919,17 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
         </div>
 
         <div>
-          <h3 class="text-base font-bold text-white">Invite Friends</h3>
+          <h3 class="text-base font-bold text-white">Join &amp; Invite</h3>
           <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-            Send your CryptoFlip invite link. When friends join through it, they land in your CryptoFlip Telegram Mini App.
+            Join our Telegram channel and invite friends to CryptoFlip. When friends join through your link, they land in the Mini App.
             You earn <strong class="text-[#f3ba2f] font-bold">+1,000 chips</strong> per invite, up to <strong class="text-[#f3ba2f] font-bold">3 invites</strong>.
           </p>
         </div>
+
+        <button id="join-tg-channel-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#229ED9]/15 border border-[#229ED9]/35 text-[#229ED9] hover:bg-[#229ED9]/25 font-semibold text-xs flex items-center justify-center gap-2 transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.993 15.674l-.396 5.568c.567 0 .813-.244 1.107-.536l2.658-2.54 5.51 4.035c1.01.557 1.725.264 1.998-.936L24.93 3.77c.321-1.497-.541-2.083-1.526-1.717L2.12 10.36c-1.458.567-1.436 1.38-.248 1.748l5.45 1.701L19.986 5.86c.596-.394 1.138-.176.692.218"/></svg>
+          <span>Join TG Channel</span>
+        </button>
 
         <!-- Invite link box -->
         <div class="flex flex-col gap-2">
@@ -4550,10 +4549,8 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
 </script>
 <script>
 (function(){
-  var btn = document.getElementById('join-tg-btn');
-  if(!btn) return;
-  btn.addEventListener('click', function(){
-    var url = 'https://t.me/pinayslick';
+  var url = 'https://t.me/pinayslick';
+  function openTg(){
     try {
       if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openTelegramLink === 'function') {
         window.Telegram.WebApp.openTelegramLink(url);
@@ -4561,7 +4558,9 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
       }
     } catch(e){}
     window.open(url, '_blank', 'noopener');
-  });
+  }
+  var btn = document.getElementById('join-tg-channel-btn');
+  if(btn) btn.addEventListener('click', openTg);
 })();
 </script>
 </body>
