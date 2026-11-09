@@ -14,3 +14,6 @@ public/
 dbpw.txt
 supabase/dbpw.txt
 supabase/.temp/
+
+.vercel
+.env*

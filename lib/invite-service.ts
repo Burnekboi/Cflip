@@ -21,8 +21,8 @@ import {
   upsertTelegramUser,
   countInviteClaimsForUser,
   type TelegramProfile,
-} from './supabase-server';
-import { parseInviteTokenFromStartParam } from '../config';
+} from './supabase-server.js';
+import { parseInviteTokenFromStartParam } from '../config.js';
 
 export const INVITE_REWARD_CHIPS = 1000;
 export const MAX_INVITE_REWARDS = 3;

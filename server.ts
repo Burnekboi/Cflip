@@ -33,19 +33,19 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { validateSupabaseConfig, type SupabaseConfig } from './supabase/index';
-import { verifyTelegramInitData } from './lib/telegram-auth';
+import { validateSupabaseConfig, type SupabaseConfig } from './supabase/index.js';
+import { verifyTelegramInitData } from './lib/telegram-auth.js';
 import {
   upsertTelegramUser,
   findOrCreateWallet,
   getOrCreateInviteToken,
   countInviteClaimsForUser,
-} from './lib/supabase-server';
+} from './lib/supabase-server.js';
 import {
   attributeInviteVisit,
   MAX_INVITE_REWARDS,
-} from './lib/invite-service';
-import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config';
+} from './lib/invite-service.js';
+import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // The Vite build writes here. Vercel serves this directory from its CDN and
