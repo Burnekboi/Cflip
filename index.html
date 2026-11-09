@@ -772,14 +772,19 @@
         <!-- Invite link box -->
         <div class="flex flex-col gap-2">
           <label class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Your invite link</label>
-          <div class="flex gap-2">              <input
+          <div class="flex gap-2">
+            <input
               id="invite-link-input"
               type="text"
               readonly
               class="flex-1 bg-[#0b0e14] border border-[#232e42] rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 break-all select-all"
               placeholder="Invite link will appear here"
             />
+            <button id="copy-invite-link-btn" class="btn-press shrink-0 py-2.5 px-3 rounded-xl bg-[#1d2638] border border-[#27344c] text-white font-bold text-xs disabled:opacity-40 disabled:pointer-events-none">
+              <span id="copy-invite-label">Copy</span>
+            </button>
           </div>
+          <div id="invite-copy-toast" class="hidden text-[10px] font-mono text-emerald-400 text-center">Link copied!</div>
         </div>
 
         <!-- Invite reward progress -->
@@ -976,6 +981,9 @@
         const InviteModal = {
           modalEl: () => document.getElementById('invite-modal'),
           inputEl: () => document.getElementById('invite-link-input'),
+          copyBtnEl: () => document.getElementById('copy-invite-link-btn'),
+          copyLabelEl: () => document.getElementById('copy-invite-label'),
+          toastEl: () => document.getElementById('invite-copy-toast'),
           pendingNoteEl: () => document.getElementById('invite-pending-note'),
           setupNoteEl: () => document.getElementById('invite-setup-note'),
 
@@ -986,16 +994,48 @@
           render() {
             const input = this.inputEl();
             if (!input) return;
+            const copyBtn = this.copyBtnEl();
+            const toast = this.toastEl();
+            if (toast) toast.classList.add('hidden');
             if (this.isReady()) {
               input.value = INVITE_LINK;
               input.placeholder = '';
+              if (copyBtn) copyBtn.disabled = false;
               this.pendingNoteEl()?.classList.add('hidden');
               this.setupNoteEl()?.classList.add('hidden');
             } else {
               input.value = '';
               input.placeholder = 'Invite link will appear here';
+              if (copyBtn) copyBtn.disabled = true;
               this.pendingNoteEl()?.classList.remove('hidden');
               this.setupNoteEl()?.classList.remove('hidden');
+            }
+          },
+
+          async copyLink() {
+            if (!this.isReady()) return;
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(INVITE_LINK);
+              } else {
+                const input = this.inputEl();
+                if (!input) return;
+                input.focus();
+                input.select();
+                input.setSelectionRange(0, INVITE_LINK.length);
+                document.execCommand('copy');
+              }
+              TelegramController.haptic('success');
+              const toast = this.toastEl();
+              const label = this.copyLabelEl();
+              if (label) label.textContent = 'Copied';
+              if (toast) toast.classList.remove('hidden');
+              setTimeout(() => {
+                if (label) label.textContent = 'Copy';
+                if (toast) toast.classList.add('hidden');
+              }, 1600);
+            } catch (e) {
+              TelegramController.haptic('error');
             }
           },
 
@@ -2827,6 +2867,13 @@
                 closeInviteBtn.addEventListener('click', () => {
                   TelegramController.haptic('light');
                   InviteModal.close();
+                });
+              }
+
+              const copyInviteBtn = document.getElementById('copy-invite-link-btn');
+              if (copyInviteBtn) {
+                copyInviteBtn.addEventListener('click', () => {
+                  InviteModal.copyLink();
                 });
               }
 
