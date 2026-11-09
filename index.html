@@ -620,6 +620,30 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
           <button id="close-games-modal" class="text-slate-400 hover:text-white p-1 text-sm font-bold">✕</button>
         </div>
 
+        <!-- GAMES DASHBOARD (list first) -->
+        <div id="games-list-view" class="flex flex-col gap-3">
+          <p class="text-xs text-slate-400">Choose a game to play.</p>
+          <button id="open-rocketcrash-btn" class="btn-press w-full text-left rounded-2xl border border-[#243044] bg-[#0b0f18] hover:border-emerald-500/40 p-3 flex items-center justify-between gap-3 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xl">🚀</div>
+              <div>
+                <div class="text-sm font-bold text-white leading-none">RocketCrash</div>
+                <div class="text-[10px] font-mono text-slate-500 mt-1">Cash out before it crashes</div>
+              </div>
+            </div>
+            <span class="text-emerald-400 text-sm font-bold">Play ›</span>
+          </button>
+
+          <button id="close-games-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
+            Close
+          </button>
+        </div>
+
+        <!-- ROCKET CRASH GAME VIEW -->
+        <div id="games-rocketcrash-view" class="hidden flex-col gap-3">
+          <button id="back-to-games-btn" class="btn-press self-start flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-2 py-1.5 rounded-lg bg-[#1e273a] border border-[#27344c]">
+            <span>←</span><span>Back to Games</span>
+          </button>
         <!-- ROCKET CRASH -->
         <div class="rounded-2xl border border-[#243044] bg-[#0b0f18] overflow-hidden flex flex-col">
           <!-- Header -->
@@ -687,10 +711,8 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
             </div>
           </div>
         </div>
+        </div>
 
-        <button id="close-games-btn" class="btn-press w-full py-2.5 rounded-xl bg-[#1e273a] font-semibold text-xs text-slate-300">
-          Close
-        </button>
       </div>
     </div>
 
@@ -3258,6 +3280,27 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
             if (closeGamesBtn) {
               closeGamesBtn.addEventListener('click', () => this.openGamesModal(false));
             }
+            const openRocketCrashBtn = document.getElementById('open-rocketcrash-btn');
+            if (openRocketCrashBtn) {
+              openRocketCrashBtn.addEventListener('click', () => {
+                const list = document.getElementById('games-list-view');
+                const rc = document.getElementById('games-rocketcrash-view');
+                if (list) list.classList.add('hidden');
+                if (rc) { rc.classList.remove('hidden'); rc.classList.add('flex'); }
+                TelegramController.haptic('light');
+                setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }, 60);
+              });
+            }
+            const backToGamesBtn = document.getElementById('back-to-games-btn');
+            if (backToGamesBtn) {
+              backToGamesBtn.addEventListener('click', () => {
+                const list = document.getElementById('games-list-view');
+                const rc = document.getElementById('games-rocketcrash-view');
+                if (rc) { rc.classList.add('hidden'); rc.classList.remove('flex'); }
+                if (list) list.classList.remove('hidden');
+                TelegramController.haptic('selection');
+              });
+            }
 
             // Celebration Modal dismissal and share
             const dismissBtn = document.getElementById('celebration-dismiss-btn');
@@ -3377,6 +3420,11 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
             const modal = document.getElementById('games-modal');
             if (!modal) return;
             if (isOpen) {
+              // Always show the games dashboard first
+              const list = document.getElementById('games-list-view');
+              const rc = document.getElementById('games-rocketcrash-view');
+              if (rc) { rc.classList.add('hidden'); rc.classList.remove('flex'); }
+              if (list) list.classList.remove('hidden');
               modal.classList.remove('hidden-modal');
               TelegramController.haptic('light');
             } else {
