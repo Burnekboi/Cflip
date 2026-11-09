@@ -574,7 +574,7 @@
 
     <!-- MODAL: GAMES -->
     <div id="games-modal" class="modal-backdrop hidden-modal fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3 sm:p-4">
-      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-md p-4 flex flex-col gap-3 relative shadow-2xl max-h-[92vh] overflow-y-auto no-scrollbar">
+      <div class="bg-[#141a27] border border-[#27344c] rounded-3xl w-full max-w-md p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex flex-col gap-4 relative shadow-2xl max-h-[92vh] overflow-y-auto no-scrollbar">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="text-xl">🎮</span>
@@ -615,7 +615,7 @@
           </div>
 
           <!-- Bet panel -->
-          <div class="p-2.5 flex flex-col gap-2 bg-[#0d121c] border-t border-[#1b2333]">
+          <div class="p-3 flex flex-col gap-2.5 bg-[#0d121c] border-t border-[#1b2333]">
             <div class="grid grid-cols-2 gap-2">
               <label class="flex flex-col gap-1">
                 <span class="text-[9px] font-mono uppercase tracking-wider text-slate-500">Bet</span>
@@ -640,7 +640,7 @@
               <button data-rc-quick="max" class="btn-press py-1.5 rounded-lg bg-[#141b27] border border-[#232e42] text-amber-400 hover:text-amber-300 text-[11px] font-bold transition-colors">Max</button>
             </div>
 
-            <button id="rc-action" class="btn-press w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-black font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40 disabled:pointer-events-none">
+            <button id="rc-action" class="btn-press relative z-10 w-full shrink-0 py-3.5 mt-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-black font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40 disabled:pointer-events-none">
               Place Bet
             </button>
 
