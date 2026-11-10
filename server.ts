@@ -45,7 +45,7 @@ import {
   attributeInviteVisit,
   MAX_INVITE_REWARDS,
 } from './lib/invite-service.js';
-import { buildInviteLink, TELEGRAM_BOT_USERNAME } from './config.js';
+import { APP_URL, buildInviteLink, TELEGRAM_BOT_USERNAME } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // The Vite build writes here. Vercel serves this directory from its CDN and
@@ -60,6 +60,7 @@ const indexHtmlPath = path.join(staticDir, 'index.html');
 const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const webhookSecret = (process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 const channelUrl = (process.env.TELEGRAM_CHANNEL_URL || 'https://t.me/pinayslick').trim();
+const appUrl = (APP_URL || 'https://cflip-beige.vercel.app').replace(/\/+$/, '');
 
 let supabaseConfig: SupabaseConfig | null = null;
 let configError: string | null = null;
@@ -245,9 +246,12 @@ app.post('/api/telegram-webhook', async (req, res) => {
         const result = await tgSendMessage(
           botToken,
           chatId,
-          '🚀 Welcome to CryptoFlip!\n\nJoin our official channel for updates, giveaways and alpha.',
+          '🚀 Welcome to CryptoFlip!\n\nTap Play to start flipping, and join our official channel for updates, giveaways and alpha.',
           {
-            inline_keyboard: [[{ text: '📣 Join Channel', url: channelUrl }]],
+            inline_keyboard: [
+              [{ text: '📣 Join Channel', url: channelUrl }],
+              [{ text: '🎮 Play CryptoFlip', web_app: { url: appUrl } }],
+            ],
           }
         );
         if (!result.ok) {
