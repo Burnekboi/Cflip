@@ -229,11 +229,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 
-  // Always acknowledge the update quickly to prevent Telegram retries.
-  res.sendStatus(200);
-
-  if (!botToken) return;
-
   try {
     const update = req.body as {
       message?: { chat?: { id?: number }; text?: string };
@@ -242,22 +237,31 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const text = message?.text?.trim() ?? '';
     const chatId = message?.chat?.id;
 
-    if (!chatId || !text) return;
+    if (botToken && chatId && text) {
+      const isStart =
+        text === '/start' || text.startsWith('/start ') || text.startsWith('/start@');
 
-    const isStart = text === '/start' || text.startsWith('/start ') || text.startsWith('/start@');
-    if (!isStart) return;
-
-    await tgSendMessage(
-      botToken,
-      chatId,
-      '🚀 Welcome to CryptoFlip!\n\nJoin our official channel for updates, giveaways and alpha.',
-      {
-        inline_keyboard: [[{ text: '📣 Join Channel', url: channelUrl }]],
+      if (isStart) {
+        const result = await tgSendMessage(
+          botToken,
+          chatId,
+          '🚀 Welcome to CryptoFlip!\n\nJoin our official channel for updates, giveaways and alpha.',
+          {
+            inline_keyboard: [[{ text: '📣 Join Channel', url: channelUrl }]],
+          }
+        );
+        if (!result.ok) {
+          console.error('[telegram-webhook] sendMessage failed:', result);
+        }
       }
-    );
+    }
   } catch (error) {
     console.error('[telegram-webhook] failed:', error);
   }
+
+  // Acknowledge only after the send finishes. On Vercel the function can be
+  // frozen as soon as the response ends, which would cancel the pending fetch.
+  res.sendStatus(200);
 });
 
 // ---------------------------------------------------------------------------
