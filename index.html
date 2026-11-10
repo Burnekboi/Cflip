@@ -4496,22 +4496,23 @@ Stay tuned, spread the word, and keep spinning! 🎮🔥</div>
 <script type="module" id="online-presence">
 (async function(){
   var el=document.getElementById('online-count'); if(!el) return;
-  var MIN=139, MAX=500;
-  var mockBase = Math.floor(MIN + Math.random() * (MAX - MIN + 1));
+  // Mock base walks sequentially between 130 and 212, one step at a time.
+  var MIN=130, MAX=212;
+  var mockBase = MIN;
+  var direction = 1;
   var realCount = 0;
-  function clamp(n){ return Math.max(MIN, Math.min(MAX, n)); }
-  function render(){ el.textContent = String(clamp(mockBase) + Math.max(0, realCount)); }
-  function driftMock(){
-    // infrequent, slow drift; keeps within 139-500
-    var delta = Math.floor((Math.random() * 7) - 3); // -3..+3
-    if (delta === 0) delta = Math.random() < 0.5 ? -1 : 1;
-    mockBase = clamp(mockBase + delta);
+  function render(){ el.textContent = String(Math.max(0, mockBase + Math.max(0, realCount))); }
+  function tickMock(){
+    // Occasional pause so the counter feels organic rather than mechanical.
+    if (Math.random() < 0.12) { render(); return; }
+    mockBase += direction;
+    if (mockBase >= MAX) { mockBase = MAX; direction = -1; }
+    else if (mockBase <= MIN) { mockBase = MIN; direction = 1; }
     render();
   }
   render();
-  // ~15 min base drift, plus rare small nudges so it isn't perfectly static
-  setInterval(driftMock, 15 * 60 * 1000);
-  setInterval(function(){ if(Math.random() < 0.25) driftMock(); }, 4 * 60 * 1000);
+  // One step every 2.5s: 130 -> 212, then back down, plus any real players.
+  setInterval(tickMock, 2500);
 
   try{
     var cfgRes = await fetch('/api/public-config', {cache:'no-store'});

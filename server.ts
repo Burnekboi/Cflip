@@ -59,6 +59,7 @@ const indexHtmlPath = path.join(staticDir, 'index.html');
 
 const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const webhookSecret = (process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
+const channelUrl = (process.env.TELEGRAM_CHANNEL_URL || 'https://t.me/pinayslick').trim();
 
 let supabaseConfig: SupabaseConfig | null = null;
 let configError: string | null = null;
@@ -246,9 +247,14 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const isStart = text === '/start' || text.startsWith('/start ') || text.startsWith('/start@');
     if (!isStart) return;
 
-    await tgSendMessage(botToken, chatId, 'Join our channel!', {
-      inline_keyboard: [[{ text: 'Join Channel', url: 'https://t.me/pinayslick' }]],
-    });
+    await tgSendMessage(
+      botToken,
+      chatId,
+      '🚀 Welcome to CryptoFlip!\n\nJoin our official channel for updates, giveaways and alpha.',
+      {
+        inline_keyboard: [[{ text: '📣 Join Channel', url: channelUrl }]],
+      }
+    );
   } catch (error) {
     console.error('[telegram-webhook] failed:', error);
   }
