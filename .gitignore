@@ -17,3 +17,7 @@ supabase/.temp/
 
 .vercel
 .env*
+
+# Local one-off scripts (never commit; may contain secrets)
+post-join-channel.ts
+_ca_inject.cjs

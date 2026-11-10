@@ -58,6 +58,7 @@ const indexHtmlPath = path.join(staticDir, 'index.html');
 // ---------------------------------------------------------------------------
 
 const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+const webhookSecret = (process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
 
 let supabaseConfig: SupabaseConfig | null = null;
 let configError: string | null = null;
@@ -192,6 +193,64 @@ app.get('/api/me', async (req, res) => {
   } catch (error) {
     console.error('[api/me] failed:', error);
     return res.status(500).json({ ok: false, error: 'Request failed' });
+  }
+});
+
+async function tgSendMessage(
+  token: string,
+  chatId: number | string,
+  text: string,
+  replyMarkup?: unknown
+): Promise<{ ok: boolean; [key: string]: unknown }> {
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    }),
+  });
+  return (await response.json()) as { ok: boolean; [key: string]: unknown };
+}
+
+/**
+ * Telegram bot webhook: replies to /start with a "Join Channel" button.
+ * Set the webhook to: https://<your-app>/api/telegram-webhook
+ */
+app.post('/api/telegram-webhook', async (req, res) => {
+  // Telegram echoes the secret configured via setWebhook. Reject anything else
+  // so third parties cannot forge updates and make the bot message chats.
+  if (!webhookSecret) {
+    return res.status(503).json({ ok: false, error: 'Webhook secret is not configured' });
+  }
+  if (req.header('x-telegram-bot-api-secret-token') !== webhookSecret) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+
+  // Always acknowledge the update quickly to prevent Telegram retries.
+  res.sendStatus(200);
+
+  if (!botToken) return;
+
+  try {
+    const update = req.body as {
+      message?: { chat?: { id?: number }; text?: string };
+    };
+    const message = update?.message;
+    const text = message?.text?.trim() ?? '';
+    const chatId = message?.chat?.id;
+
+    if (!chatId || !text) return;
+
+    const isStart = text === '/start' || text.startsWith('/start ') || text.startsWith('/start@');
+    if (!isStart) return;
+
+    await tgSendMessage(botToken, chatId, 'Join our channel!', {
+      inline_keyboard: [[{ text: 'Join Channel', url: 'https://t.me/pinayslick' }]],
+    });
+  } catch (error) {
+    console.error('[telegram-webhook] failed:', error);
   }
 });
 
